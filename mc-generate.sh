@@ -1,0 +1,218 @@
+#!/bin/bash
+
+### MAILCHIMP RECURRING HTML EMAIL GENERATOR
+
+# ====================
+# Author: Tim Fletcher
+# Date: 2024-08-09
+# Licence: GPL-3.0
+# Source location: https://github.com/T-Fletcher/mailchimp-recurring-html-email-generator
+# ====================
+
+# NOTE: Times are in UTC
+NOW=$(date -u +"%Y%m%dT%H:%M:%S%z")
+NOW_EPOCH=$(date +%s)
+
+# Better logging
+function logError() {
+    local message=$1
+    local errorCode=$2
+    echo -e "[ERROR] - $message"
+    exit $errorCode
+}
+function logInfo() {
+    local message=$1
+    echo -e "[INFO] - $message"
+}
+function logDebug() {
+    local message=$1
+    echo -e "[DEBUG] - $message"
+}
+function receivedData() {
+    local message=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Failed to get $message, exit code $EXIT_CODE"
+    else
+        logInfo "$message received!"
+    fi
+}
+
+# Test env variables are ok
+if [[ -f ".env" ]]; then
+    source ".env"
+    if [[ $DEBUG == "true" ]]; then
+        logDebug "DEBUG mode is enabled"
+    fi
+else
+    logError "Environment variable file '.env' does not exist.
+    You can create one by copying '.env.example'." 1;
+fi
+
+if [[ -z $MAILCHIMP_SERVER_PREFIX || -z $MAILCHIMP_API_KEY || -z $EMAIL_CONTENT_URL || -z $MAILCHIMP_EMAIL_SHORT_NAME ]]; then
+    logError "Required environment variables are missing.
+    See '.env.example' for required variables." 2;
+fi
+
+if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
+    logInfo "Terminus site environment variable is not set!
+    Let's assume your URL isn't from a Pantheon Drupal website.
+    You can proceed but will need to handle clearing your
+    website's cache some other way, or you may recieve stale data.";
+fi
+
+
+# Folder structure and logs
+ROOT_DIR=$(pwd)
+FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
+URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
+DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
+MAILCHIMP_ACTIVITY_DIR="$ROOT_DIR/$URL_NAME"
+MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
+MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_ACTIVITY_DIR/$URL_NAME-output-$NOW.log"
+
+echo -e "$FULL_NAME starting..."
+
+if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
+    mkdir $MAILCHIMP_ACTIVITY_DIR
+fi
+
+# Send script output to the logs, unless debug mode is enabled
+if [[ ! $DEBUG == "true" ]]; then
+    echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
+    exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
+fi
+
+trap cleanUp EXIT
+
+function replaceLogFolder() {
+    local DIRECTORY=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        echo -e "[ERROR] Failed to remove $DIRECTORY, exit code $EXIT_CODE. Quitting..."
+        exit 2
+    fi
+}
+
+function cleanUp() {
+    logInfo "Cleaning up script artifacts..."
+    
+    cd $ROOT_DIR
+    logInfo "Switching to $ROOT_DIR"
+    if [[ ! -f $MAILCHIMP_EXECUTION_LOG_FILENAME ]]; then
+        touch $MAILCHIMP_EXECUTION_LOG_FILENAME
+    fi
+    
+    # Track the daily success/failure of the script, in a place that isn't
+    # affected by the cleanup steps
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+    else
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+    fi
+    
+    rm -rf $DIR;
+    rm -rf "$URL_NAME-logs*"
+    
+    logInfo "Clean up complete!"
+    
+    COMPLETE_TIME=$(date +%s)
+    logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(date -u +"%Y%m%dT%H:%M:%S%z")"
+    code $MAILCHIMP_SCRIPT_LOGFILE
+}
+
+# Test log locations exist
+if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
+    logError "$MAILCHIMP_ACTIVITY_DIR directory not found, quitting..."
+    exit 6
+fi
+
+if [[ -d $DIR ]]; then
+    logInfo "Log folder '$DIR' already exists, deleting it to start fresh..."
+    rm -rf $DIR
+    EXIT_CODE=$? replaceLogFolder $DIR
+    mkdir $DIR
+else
+    logInfo "Log folder not found, creating '$DIR'..."
+    mkdir $DIR
+fi
+
+if [[ ! -d $DIR ]]; then
+    logError "No $DIR found, quitting..."
+    exit 3
+fi
+
+cd $DIR
+
+logInfo "Switching to $DIR"
+
+# Set the required Mailchimp API variables
+MAILCHIMP_SERVER_PREFIX=$MAILCHIMP_SERVER_PREFIX
+MAILCHIMP_API_KEY=$MAILCHIMP_API_KEY
+
+function testLogin() {
+    local SERVICE=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Could not log into $SERVICE (Exit code $EXIT_CODE), quitting..." 1
+    else
+        logInfo "$SERVICE login successful!"
+    fi
+}
+
+if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
+    logInfo "Terminus sitename provided: $DRUPAL_TERMINUS_SITE"
+    logInfo "Attempting to log into Terminus via machine token to prevent session timeouts..."
+    
+    terminus auth:login
+    EXIT_CODE=$? testLogin 'Terminus'
+    
+    logInfo "Testing Drush access..."
+    terminus remote:drush $DRUPAL_TERMINUS_SITE -- status | grep 'Drupal bootstrap'
+    EXIT_CODE=$? testLogin 'Drupal'
+    
+    logInfo "Flushing Drupal caches..."
+    terminus remote:drush $DRUPAL_TERMINUS_SITE -- cr
+    
+    # Pause before hitting Drupal for the new content, to avoid a race
+    sleep 10
+fi
+
+#TODO: Date should be in UTC, then converted to AEST
+DATE=$(date "+%d %h %Y %H:%m:%S")
+
+if [[ $DEBUG == "true" ]] && [[ -f "test-data.html" ]]; then
+    logDebug "Using data from 'test-data.html'..."
+    HTML=$(<"test/test-data.html")
+else
+    logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
+    HTML=$(curl -s "$EMAIL_CONTENT_URL")
+    EXIT_CODE=$? receivedData 'HTML data'
+fi
+
+logInfo "Encoding HTML data as a JSON-safe string"
+# TODO: This isn't tested for a valid response
+HTML_ENCODED=$(jq -Rs <<< $HTML)
+
+# Replace the warpping double quotes "" with single quotes to make it valid JSON
+# when we add it to the curl request's JSON object
+DATA="${HTML_ENCODED:1:-1}"
+
+logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
+curl -sX POST \
+  "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
+  --user "anystring:${MAILCHIMP_API_KEY}" \
+  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$DATA\"}" | jq -r "."
+EXIT_CODE=$? receivedData 'Template creation response'
+
+# curl -sX GET \
+#   "https://${dc}.api.mailchimp.com/3.0/templates?since_date_created=2024-08-07T00:00:00+00:00" \
+#   --user "anystring:${MAILCHIMP_API_KEY}" | jq -r "."
+
+
+# TODO:
+# 1. Get template ID
+# 2. Generate new Campaign with ID, schedule to send
+# 3. Confrim Campaign is created, check content within
+# 5. Delete the Template
+
+logInfo "$FULL_NAME completed successfully!"
+
+exit 0

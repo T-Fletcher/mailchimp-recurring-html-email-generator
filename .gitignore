@@ -1,0 +1,12 @@
+# Ignore
+
+.env
+*.zip
+*.tar
+*.gz
+
+# Test content
+test-*
+
+# Script logs
+mailchimp-*.log
