@@ -20,14 +20,23 @@ function logError() {
     echo -e "[ERROR] - $message"
     exit $errorCode
 }
+
 function logInfo() {
     local message=$1
     echo -e "[INFO] - $message"
 }
+
+function logWarning() {
+    local message=$1
+    echo -e "[WARNING] - $message"
+}
+
 function logDebug() {
     local message=$1
     echo -e "[DEBUG] - $message"
 }
+
+# Handle responses when requesting data
 function receivedData() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
@@ -36,8 +45,32 @@ function receivedData() {
         logInfo "$message received!"
     fi
 }
+function testLogin() {
+    local SERVICE=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Could not log into $SERVICE (Exit code $EXIT_CODE), quitting..." 1
+    else
+        logInfo "$SERVICE login successful!"
+    fi
+}
 
-# Test env variables are ok
+function replaceLogFolder() {
+    local DIRECTORY=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Failed to remove $DIRECTORY, exit code $EXIT_CODE. Quitting..."
+        exit 2
+    fi
+}
+
+function tidyErrors() {
+    local ERRORS=$1
+    if [[ $EXIT_CODE -ne 0 ]]; then
+      logError "Tidy found errors with the HTML file. Exit code: $EXIT_CODE"
+      exit $EXIT_CODE
+    fi
+}
+
+# Load env variables before doing anything else
 if [[ -f ".env" ]]; then
     source ".env"
     if [[ $DEBUG == "true" ]]; then
@@ -48,9 +81,35 @@ else
     You can create one by copying '.env.example'." 1;
 fi
 
+# Set up folder structure and logs names
+ROOT_DIR=$(pwd)
+FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
+URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
+DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
+MAILCHIMP_ACTIVITY_DIR="$ROOT_DIR/$URL_NAME"
+MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
+MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_ACTIVITY_DIR/$URL_NAME-output-$NOW.log"
+
+# Send script output to the logs, unless debug mode is enabled
+if [[ ! $DEBUG == "true" ]]; then
+    echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
+    exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
+fi
+
+logInfo "$FULL_NAME starting..."
+
+if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
+    mkdir $MAILCHIMP_ACTIVITY_DIR
+fi
+
 if [[ -z $MAILCHIMP_SERVER_PREFIX || -z $MAILCHIMP_API_KEY || -z $EMAIL_CONTENT_URL || -z $MAILCHIMP_EMAIL_SHORT_NAME ]]; then
     logError "Required environment variables are missing.
     See '.env.example' for required variables." 2;
+fi
+
+if [[ -z $MAILCHIMP_TARGET_AUDIENCE_ID ]]; then
+    logWarning "Target Mailchimp Audience ID environment variable is missing! 
+    The Template will still be generated but no emails will be created or sent."
 fi
 
 if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
@@ -60,37 +119,7 @@ if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
     website's cache some other way, or you may recieve stale data.";
 fi
 
-
-# Folder structure and logs
-ROOT_DIR=$(pwd)
-FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
-URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
-DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
-MAILCHIMP_ACTIVITY_DIR="$ROOT_DIR/$URL_NAME"
-MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
-MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_ACTIVITY_DIR/$URL_NAME-output-$NOW.log"
-
-echo -e "$FULL_NAME starting..."
-
-if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
-    mkdir $MAILCHIMP_ACTIVITY_DIR
-fi
-
-# Send script output to the logs, unless debug mode is enabled
-if [[ ! $DEBUG == "true" ]]; then
-    echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
-    exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
-fi
-
 trap cleanUp EXIT
-
-function replaceLogFolder() {
-    local DIRECTORY=$1
-    if [[ $EXIT_CODE -ne 0 ]]; then
-        echo -e "[ERROR] Failed to remove $DIRECTORY, exit code $EXIT_CODE. Quitting..."
-        exit 2
-    fi
-}
 
 function cleanUp() {
     logInfo "Cleaning up script artifacts..."
@@ -111,6 +140,7 @@ function cleanUp() {
     
     rm -rf $DIR;
     rm -rf "$URL_NAME-logs*"
+    rm -rf "html.tmp"
     
     logInfo "Clean up complete!"
     
@@ -148,14 +178,6 @@ logInfo "Switching to $DIR"
 MAILCHIMP_SERVER_PREFIX=$MAILCHIMP_SERVER_PREFIX
 MAILCHIMP_API_KEY=$MAILCHIMP_API_KEY
 
-function testLogin() {
-    local SERVICE=$1
-    if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Could not log into $SERVICE (Exit code $EXIT_CODE), quitting..." 1
-    else
-        logInfo "$SERVICE login successful!"
-    fi
-}
 
 if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     logInfo "Terminus sitename provided: $DRUPAL_TERMINUS_SITE"
@@ -170,17 +192,19 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     
     logInfo "Flushing Drupal caches..."
     terminus remote:drush $DRUPAL_TERMINUS_SITE -- cr
-    
+    EXIT_CODE=$? receivedData 'Drupal cache flush'
+
     # Pause before hitting Drupal for the new content, to avoid a race
     sleep 10
 fi
 
 #TODO: Date should be in UTC, then converted to AEST
-DATE=$(date "+%d %h %Y %H:%m:%S")
+DATE=$(date "+%d %h %Y %H:%M:%S")
 
 if [[ $DEBUG == "true" ]] && [[ -f "test-data.html" ]]; then
     logDebug "Using data from 'test-data.html'..."
     HTML=$(<"test/test-data.html")
+    EXIT_CODE=$? receivedData 'HTML test data'
 else
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     HTML=$(curl -s "$EMAIL_CONTENT_URL")
@@ -190,16 +214,14 @@ fi
 logInfo "Encoding HTML data as a JSON-safe string"
 # TODO: This isn't tested for a valid response
 HTML_ENCODED=$(jq -Rs <<< $HTML)
+EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 
-# Replace the warpping double quotes "" with single quotes to make it valid JSON
-# when we add it to the curl request's JSON object
-DATA="${HTML_ENCODED:1:-1}"
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
-curl -sX POST \
+MAILCHIMP_TEMPLATE_RESPONSE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$DATA\"}" | jq -r "."
+  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$DATA\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
 # curl -sX GET \

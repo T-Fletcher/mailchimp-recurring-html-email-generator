@@ -35,12 +35,13 @@ Mailchimp API documentation: https://mailchimp.com/developer/marketing/api/
 All variables except `DRUPAL_TERMINUS_SITE` are required.
 
 ```
-DEBUG                       - boolean - defaults to false
-EMAIL_CONTENT_URL           - string - URL to the webpage containing the data
-MAILCHIMP_EMAIL_SHORT_NAME  - string - Some distinctive name without spaces e.g. star-wars
-MAILCHIMP_SERVER_PREFIX     - string - Mailchimp URL prefix
-MAILCHIMP_API_KEY           - string - Your Mailchimp API key
-DRUPAL_TERMINUS_SITE        - string - Your Drupal website's Terminus alias, if any
+DEBUG                        - boolean - defaults to false
+EMAIL_CONTENT_URL            - string - URL to the webpage containing the data
+MAILCHIMP_EMAIL_SHORT_NAME   - string - Some distinctive name without spaces e.g. star-wars
+MAILCHIMP_SERVER_PREFIX      - string - Mailchimp URL prefix
+MAILCHIMP_API_KEY            - string - Your Mailchimp API key
+MAILCHIMP_TARGET_AUDIENCE_ID - string - Your Mailchimp Audience ID, get this via the API
+DRUPAL_TERMINUS_SITE         - string - Your Drupal website's Terminus alias, if any
 ```
 
 Read more about where these can be found:
