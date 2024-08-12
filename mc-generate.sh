@@ -44,7 +44,7 @@ function receivedData() {
     fi
 }
 
-function testResponseCode() {
+function testResponseStatus() {
     local responseCode=$1
     if [[ $responseCode -lt 200 || $responseCode -gt 299 ]]; then
         logError "Non-200 response code '$responseCode' received from successful response! Quitting..." $responseCode
@@ -226,9 +226,24 @@ MAILCHIMP_TEMPLATE_RESPONSE=$(curl -sX POST \
   -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$DATA\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
-# curl -sX GET \
-#   "https://${dc}.api.mailchimp.com/3.0/templates?since_date_created=2024-08-07T00:00:00+00:00" \
-#   --user "anystring:${MAILCHIMP_API_KEY}" | jq -r "."
+MAILCHIMP_TEMPLATE_STATUS=$(echo $MAILCHIMP_TEMPLATE_RESPONSE | jq -r ".status")
+
+# Test the Mailchimp response was successful, as it may return a 0 exit code
+# then include an error response
+testResponseStatus $MAILCHIMP_TEMPLATE_STATUS
+
+MAILCHIMP_TEMPLATE_ID=$(echo $MAILCHIMP_TEMPLATE_RESPONSE | jq -r ".id")
+EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
+
+# curl -X GET \
+#   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
+#   --user "anystring:${MAILCHIMP_API_KEY}"
+
+# MAILCHIMP_EMAIL=$(curl -X GET \
+#   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
+#   --user "anystring:${MAILCHIMP_API_KEY}")
+# EXIT_CODE=$? receivedData 'Email creation response'
+
 
 
 # TODO:
