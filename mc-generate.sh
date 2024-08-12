@@ -33,7 +33,9 @@ function logWarning() {
 
 function logDebug() {
     local message=$1
-    echo -e "[DEBUG] - $message"
+    if [[ $DEBUG == "true" ]]; then
+        echo -e "[DEBUG] - $message"
+    fi
 }
 
 # Handle responses when requesting data 
@@ -101,6 +103,8 @@ TEST_DATA="../test/test-data.html"
 if [[ ! $DEBUG == "true" ]]; then
     echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
     exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
+else 
+    MAILCHIMP_EMAIL_SHORT_NAME=$(echo "TEST--$MAILCHIMP_EMAIL_SHORT_NAME")
 fi
 
 logInfo "$FULL_NAME starting..."
@@ -210,12 +214,19 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
     HTML=$(<$TEST_DATA)
     EXIT_CODE=$? receivedData 'HTML test data'
-    logDebug "Data:\n$HTML"
 else
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     HTML=$(curl -s "$EMAIL_CONTENT_URL")
     EXIT_CODE=$? receivedData 'HTML data'
 fi
+
+logDebug "Data:\n$HTML"
+
+# logInfo "Checking HTML is valid..."
+# echo -e "$HTML" > "html.tmp"
+
+# TIDY_HTML_OUTPUT=$(tidy -m "html.tmp" -f "html_errors.tmp")
+# EXIT_CODE=$? tidyErrors html_errors.tmp
 
 logInfo "Encoding HTML data as a JSON-safe string"
 HTML_ENCODED=$(jq -Rs <<< "$HTML")
@@ -225,24 +236,32 @@ EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 HTML_ENCODED="'${HTML_ENCODED:1:-1}'"
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
-MAILCHIMP_TEMPLATE_RESPONSE=$(curl -sX POST \
+MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
   -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
-MAILCHIMP_TEMPLATE_STATUS=$(echo $MAILCHIMP_TEMPLATE_RESPONSE | jq -r ".status")
+logDebug "$MAILCHIMP_CREATE_TEMPLATE"
+
+MAILCHIMP_CREATE_TEMPLATE_STATUS=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".status")
 
 # Test the Mailchimp response was successful, as it may return a 0 exit code
 # then include an error response
-testResponseStatus $MAILCHIMP_TEMPLATE_STATUS
+testResponseStatus $MAILCHIMP_CREATE_TEMPLATE_STATUS
 
-MAILCHIMP_TEMPLATE_ID=$(echo $MAILCHIMP_TEMPLATE_RESPONSE | jq -r ".id")
+MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
 EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 
-# curl -X GET \
-#   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
-#   --user "anystring:${MAILCHIMP_API_KEY}"
+MAILCHIMP_NEW_TEMPLATE=$(curl -X GET \
+  "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
+  --user "anystring:${MAILCHIMP_API_KEY}")
+EXIT_CODE=$? receivedData "New Template $MAILCHIMP_TEMPLATE_ID"
+
+logDebug "$MAILCHIMP_NEW_TEMPLATE"
+
+MAILCHIMP_NEW_TEMPLATE_STATUS=$(echo -e $MAILCHIMP_NEW_TEMPLATE | jq -r ".status")
+testResponseStatus $MAILCHIMP_NEW_TEMPLATE_STATUS
 
 # MAILCHIMP_EMAIL=$(curl -X GET \
 #   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
@@ -253,7 +272,7 @@ EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 
 # TODO:
 # 1. Get template ID
-# 2. Generate new Campaign with ID, schedule to send
+# 2. If DEBUG mode is disabled, generate new Campaign with ID, schedule to send
 # 3. Confrim Campaign is created, check content within
 # 5. Delete the Template
 
