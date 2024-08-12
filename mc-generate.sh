@@ -36,15 +36,21 @@ function logDebug() {
     echo -e "[DEBUG] - $message"
 }
 
-# Handle responses when requesting data
+# Handle responses when requesting data 
 function receivedData() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Failed to get $message, exit code $EXIT_CODE"
-    else
-        logInfo "$message received!"
+        logError "Failed to get $message" $EXIT_CODE
     fi
 }
+
+function testResponseCode() {
+    local responseCode=$1
+    if [[ $responseCode -lt 200 || $responseCode -gt 299 ]]; then
+        logError "Non-200 response code '$responseCode' received from successful response! Quitting..." $responseCode
+    fi
+}
+
 function testLogin() {
     local SERVICE=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
@@ -57,16 +63,14 @@ function testLogin() {
 function replaceLogFolder() {
     local DIRECTORY=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Failed to remove $DIRECTORY, exit code $EXIT_CODE. Quitting..."
-        exit 2
+        logError "Failed to remove $DIRECTORY, exit code $EXIT_CODE. Quitting..." 2
     fi
 }
 
 function tidyErrors() {
     local ERRORS=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-      logError "Tidy found errors with the HTML file. Exit code: $EXIT_CODE"
-      exit $EXIT_CODE
+      logError "Tidy found errors with the HTML file. Exit code: $EXIT_CODE" $EXIT_CODE
     fi
 }
 
@@ -113,7 +117,7 @@ if [[ -z $MAILCHIMP_TARGET_AUDIENCE_ID ]]; then
 fi
 
 if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
-    logInfo "Terminus site environment variable is not set!
+    logWarning "Terminus site environment variable is not set!
     Let's assume your URL isn't from a Pantheon Drupal website.
     You can proceed but will need to handle clearing your
     website's cache some other way, or you may recieve stale data.";
@@ -151,8 +155,7 @@ function cleanUp() {
 
 # Test log locations exist
 if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
-    logError "$MAILCHIMP_ACTIVITY_DIR directory not found, quitting..."
-    exit 6
+    logError "$MAILCHIMP_ACTIVITY_DIR directory not found, quitting..." 6
 fi
 
 if [[ -d $DIR ]]; then
@@ -166,8 +169,7 @@ else
 fi
 
 if [[ ! -d $DIR ]]; then
-    logError "No $DIR found, quitting..."
-    exit 3
+    logError "No $DIR found, quitting..." 3
 fi
 
 cd $DIR
@@ -201,9 +203,9 @@ fi
 #TODO: Date should be in UTC, then converted to AEST
 DATE=$(date "+%d %h %Y %H:%M:%S")
 
-if [[ $DEBUG == "true" ]] && [[ -f "test-data.html" ]]; then
-    logDebug "Using data from 'test-data.html'..."
-    HTML=$(<"test/test-data.html")
+if [[ $DEBUG == "true" && -f "../test/test-data.html" ]]; then
+    logDebug "Using data from '../test/test-data.html'..."
+    HTML=$(<"../test/test-data.html")
     EXIT_CODE=$? receivedData 'HTML test data'
 else
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
