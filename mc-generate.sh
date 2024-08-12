@@ -45,9 +45,11 @@ function receivedData() {
 }
 
 function testResponseStatus() {
-    local responseCode=$1
-    if [[ $responseCode -lt 200 || $responseCode -gt 299 ]]; then
-        logError "Non-200 response code '$responseCode' received from successful response! Quitting..." $responseCode
+    local responseStatus=$1
+    if [[ $responseStatus == "" || $responseStatus == "null" ]] ;then
+        logInfo "No response status received from successful 0 exit code, assuming it's fine..."
+    elif [[ $responseStatus -lt 200 || $responseStatus -gt 299 ]]; then
+        logError "Non-200 response code '$responseStatus' received from successful 0 exit code! Quitting..." $responseStatus
     fi
 }
 
@@ -93,6 +95,7 @@ DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
 MAILCHIMP_ACTIVITY_DIR="$ROOT_DIR/$URL_NAME"
 MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
 MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_ACTIVITY_DIR/$URL_NAME-output-$NOW.log"
+TEST_DATA="../test/test-data.html"
 
 # Send script output to the logs, unless debug mode is enabled
 if [[ ! $DEBUG == "true" ]]; then
@@ -203,10 +206,11 @@ fi
 #TODO: Date should be in UTC, then converted to AEST
 DATE=$(date "+%d %h %Y %H:%M:%S")
 
-if [[ $DEBUG == "true" && -f "../test/test-data.html" ]]; then
-    logDebug "Using data from '../test/test-data.html'..."
-    HTML=$(<"../test/test-data.html")
+if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
+    logDebug "Using data from '$TEST_DATA'..."
+    HTML=$(<$TEST_DATA)
     EXIT_CODE=$? receivedData 'HTML test data'
+    logDebug "Data:\n$HTML"
 else
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     HTML=$(curl -s "$EMAIL_CONTENT_URL")
@@ -214,16 +218,17 @@ else
 fi
 
 logInfo "Encoding HTML data as a JSON-safe string"
-# TODO: This isn't tested for a valid response
-HTML_ENCODED=$(jq -Rs <<< $HTML)
+HTML_ENCODED=$(jq -Rs <<< "$HTML")
 EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 
+# Replace the quote wrappers with single quotes so it's valid JSON for Mailchimp
+HTML_ENCODED="'${HTML_ENCODED:1:-1}'"
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
 MAILCHIMP_TEMPLATE_RESPONSE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$DATA\"}")
+  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
 MAILCHIMP_TEMPLATE_STATUS=$(echo $MAILCHIMP_TEMPLATE_RESPONSE | jq -r ".status")
