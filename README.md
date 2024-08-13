@@ -41,6 +41,10 @@ MAILCHIMP_EMAIL_SHORT_NAME   - string - Some distinctive name without spaces e.g
 MAILCHIMP_SERVER_PREFIX      - string - Mailchimp URL prefix
 MAILCHIMP_API_KEY            - string - Your Mailchimp API key
 MAILCHIMP_TARGET_AUDIENCE_ID - string - Your Mailchimp Audience ID, get this via the API
+MAILCHIMP_EMAIL_FROM         - string - The name of the sender of the email
+MAILCHIMP_EMAIL_REPLYTO      - string - The email address to reply to
+MAILCHIMP_EMAIL_TITLE        - string - The Campaign title in Mailchimp
+MAILCHIMP_EMAIL_SUBJECT      - string - The email subject line
 DRUPAL_TERMINUS_SITE         - string - Your Drupal website's Terminus alias, if any
 ```
 

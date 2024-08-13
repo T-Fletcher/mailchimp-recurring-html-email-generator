@@ -49,9 +49,9 @@ function receivedData() {
 function testResponseStatus() {
     local responseStatus=$1
     if [[ $responseStatus == "" || $responseStatus == "null" ]] ;then
-        logInfo "No response status received from successful 0 exit code, assuming it's fine..."
+        logInfo "No 'status' prop received from response with successful 0 exit code, assuming it's fine..."
     elif [[ $responseStatus -lt 200 || $responseStatus -gt 299 ]]; then
-        logError "Non-200 response code '$responseStatus' received from successful 0 exit code! Quitting..." $responseStatus
+        logError "Non-200 'status' prop value '$responseStatus' received from response with successful 0 exit code! Quitting..." $responseStatus
     fi
 }
 
@@ -148,6 +148,8 @@ function cleanUp() {
     else
         logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
+
+    # TODO: Remove any Mailchimp resources created e.g. templates, emails etc
     
     rm -rf $DIR;
     rm -rf "$URL_NAME-logs*"
@@ -253,7 +255,7 @@ testResponseStatus $MAILCHIMP_CREATE_TEMPLATE_STATUS
 MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
 EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 
-MAILCHIMP_NEW_TEMPLATE=$(curl -X GET \
+MAILCHIMP_NEW_TEMPLATE=$(curl -sX GET \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
   --user "anystring:${MAILCHIMP_API_KEY}")
 EXIT_CODE=$? receivedData "New Template $MAILCHIMP_TEMPLATE_ID"
@@ -263,18 +265,55 @@ logDebug "$MAILCHIMP_NEW_TEMPLATE"
 MAILCHIMP_NEW_TEMPLATE_STATUS=$(echo -e $MAILCHIMP_NEW_TEMPLATE | jq -r ".status")
 testResponseStatus $MAILCHIMP_NEW_TEMPLATE_STATUS
 
-# MAILCHIMP_EMAIL=$(curl -X GET \
-#   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
-#   --user "anystring:${MAILCHIMP_API_KEY}")
-# EXIT_CODE=$? receivedData 'Email creation response'
+# Only create the email campaign if debugging is disabled
+# if [[ ! $DEBUG == "true" ]]; then
 
+# TODO: Get creating the campaign working. Currenly nothing appears in Mailchimp...
 
+    MAILCHIMP_EMAIL=$(curl -sX POST \
+    "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns" \
+    --user "anystring:${MAILCHIMP_API_KEY}" \
+    -d '{
+        "type": "regular",
+        "recipients": {
+            "list_id": '\""$MAILCHIMP_TARGET_AUDIENCE_ID"\"',
+            "segment_opts": { "saved_segment_id": 0, "match": "any", "conditions": [] }
+        },
+        "settings": {
+            "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT"\"',
+            "preview_text": "",
+            "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATE"\"',
+            "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
+            "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
+            "use_conversation": false,
+            "to_name": "",
+            "folder_id": "",
+            "authenticate": false,
+            "auto_footer": true,
+            "inline_css": false,
+            "auto_tweet": false,
+            "auto_fb_post": [],
+            "fb_comments": false,
+            "template_id": '"$MAILCHIMP_TEMPLATE_ID"'
+        },
+            "content_type": "template"
+        }')
+    EXIT_CODE=$? receivedData 'Email Campaign creation response'
+
+    MAILCHIMP_CREATE_EMAIL_STATUS=$(echo -e $MAILCHIMP_EMAIL | jq -r ".status")
+
+    testResponseStatus $MAILCHIMP_CREATE_EMAIL_STATUS
+
+    logDebug "$MAILCHIMP_EMAIL"
+    
+# else 
+#     logDebug "Debugging is enabled, skipping email creation..."
+# fi
 
 # TODO:
-# 1. Get template ID
-# 2. If DEBUG mode is disabled, generate new Campaign with ID, schedule to send
-# 3. Confrim Campaign is created, check content within
-# 5. Delete the Template
+# 1. If DEBUG mode is disabled, generate new Campaign with ID, schedule to send
+# 2. Confrim Campaign is created, check content within
+# 3. Delete the Template
 
 logInfo "$FULL_NAME completed successfully!"
 

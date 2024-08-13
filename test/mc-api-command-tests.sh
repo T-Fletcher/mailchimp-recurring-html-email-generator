@@ -98,4 +98,4 @@ JOURNEY_ID=""
 # curl -sX POST \
 #   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
 #   --user "anystring:${MAILCHIMP_API_KEY}" \
-#   -d "{\"name\":\"TEST Template\",\"folder_id\":\"\",\"html\": \"<html><h1>My Test Template</h1></html>\"}"
+#   -d "{\"name\":\"TEST Template\",\"folder_id\":\"\",\"html\": \"$CONTENT\"}"
