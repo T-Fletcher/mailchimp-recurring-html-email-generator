@@ -289,7 +289,7 @@ EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
             "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
             "use_conversation": false,
             "to_name": "",
-            "folder_id": "",
+            "folder_id": '\""$MAILCHIMP_EMAIL_FOLDER_ID"\"',
             "authenticate": false,
             "auto_footer": true,
             "inline_css": false,

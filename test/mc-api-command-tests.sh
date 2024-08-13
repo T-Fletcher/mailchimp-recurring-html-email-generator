@@ -99,3 +99,11 @@ JOURNEY_ID=""
 #   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
 #   --user "anystring:${MAILCHIMP_API_KEY}" \
 #   -d "{\"name\":\"TEST Template\",\"folder_id\":\"\",\"html\": \"$CONTENT\"}"
+
+
+# Get all email Campaign folders
+
+# curl -sX GET \
+# "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaign-folders/?count=1000" \
+# --user "anystring:${MAILCHIMP_API_KEY}" \
+# -d '{"email_address":""}'  | jq -r "."
