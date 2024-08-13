@@ -226,6 +226,9 @@ fi
 
 #TODO: Date should be in UTC, then converted to AEST
 DATE=$(date "+%d %h %Y %H:%M:%S")
+DATE_AEST=$(TZ=Australia/Sydney date +"%d %h %Y")
+
+logInfo "Using the time '$DATE_AEST' for the email subject line and title"
 
 if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
@@ -256,7 +259,7 @@ logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
 MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
+  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE_AEST\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
 logDebug "$MAILCHIMP_CREATE_TEMPLATE"
@@ -270,39 +273,39 @@ EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 # Only create the email campaign if debugging is disabled
 # if [[ ! $DEBUG == "true" ]]; then
 
-# TODO: Get creating the campaign working. Currenly nothing appears in Mailchimp...
+#* See list of all Campaign options: 
+#* https://mailchimp.com/developer/marketing/api/campaigns/add-campaign/
 
-    MAILCHIMP_EMAIL=$(curl -sX POST \
-    "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns" \
-    --user "anystring:${MAILCHIMP_API_KEY}" \
-    -d '{
-        "type": "regular",
-        "recipients": {
-            "list_id": '\""$MAILCHIMP_TARGET_AUDIENCE_ID"\"',
-            "segment_opts": { "saved_segment_id": 0, "match": "any", "conditions": [] }
-        },
-        "settings": {
-            "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT"\"',
-            "preview_text": "",
-            "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATE"\"',
-            "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
-            "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
-            "use_conversation": false,
-            "to_name": "",
-            "folder_id": '\""$MAILCHIMP_EMAIL_FOLDER_ID"\"',
-            "authenticate": false,
-            "auto_footer": true,
-            "inline_css": false,
-            "auto_tweet": false,
-            "auto_fb_post": [],
-            "fb_comments": false,
-            "template_id": '"$MAILCHIMP_TEMPLATE_ID"'
-        },
-            "content_type": "template"
-        }')
-    EXIT_CODE=$? receivedData 'Email Campaign creation response'
+MAILCHIMP_EMAIL=$(curl -sX POST \
+"https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns" \
+--user "anystring:${MAILCHIMP_API_KEY}" \
+-d '{
+    "type": "regular",
+    "recipients": {
+        "list_id": '\""$MAILCHIMP_TARGET_AUDIENCE_ID"\"'
+    },
+    "settings": {
+        "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE_AEST"\"',
+        "preview_text": "",
+        "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATE_AEST"\"',
+        "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
+        "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
+        "use_conversation": false,
+        "to_name": "",
+        "folder_id": '\""$MAILCHIMP_EMAIL_FOLDER_ID"\"',
+        "authenticate": false,
+        "auto_footer": true,
+        "inline_css": false,
+        "auto_tweet": false,
+        "auto_fb_post": [],
+        "fb_comments": false,
+        "template_id": '"$MAILCHIMP_TEMPLATE_ID"'
+    },
+        "content_type": "template"
+    }')
+EXIT_CODE=$? receivedData 'Email Campaign creation response'
 
-    logDebug "$MAILCHIMP_EMAIL"
+logDebug "$MAILCHIMP_EMAIL"
 
 testMailchimpResponse "$MAILCHIMP_EMAIL"
 
@@ -311,9 +314,11 @@ testMailchimpResponse "$MAILCHIMP_EMAIL"
 # fi
 
 # TODO:
-# 1. If DEBUG mode is disabled, generate new Campaign with ID, schedule to send
-# 2. Confrim Campaign is created, check content within
-# 3. Delete the Template
+# 1. Test and escape DATE before passing to curl
+# 2. Populate $DATE in email title and send time
+# 2. Assign to valid mailing group segment 
+# 3. Schedule to send
+# 4. Confrim Campaign is created, check content within
 
 logInfo "$FULL_NAME completed successfully!"
 
