@@ -8,5 +8,8 @@
 # Test content
 test-*
 
+# Private Mailchimp user content
+mailchimp-data-*-ids.txt
+
 # Script logs
 mailchimp-*.log
