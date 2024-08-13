@@ -160,7 +160,7 @@ function cleanUp() {
     fi
 
     # Remove Mailchimp Templates created by the script, whether by testing or not
-    if [[ ! -z $MAILCHIMP_TEMPLATE_ID ]]; then
+    if [[ ! -z $MAILCHIMP_TEMPLATE_ID && -z $DELETE_TEMPLATE_ON_CLEANUP || $DELETE_TEMPLATE_ON_CLEANUP == "true" ]]; then
         curl -sX DELETE \
         "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
         --user "anystring:${MAILCHIMP_API_KEY}"
