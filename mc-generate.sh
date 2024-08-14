@@ -228,8 +228,6 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     sleep 10
 fi
 
-#TODO: Date should be in UTC, then converted to AEST
-DATE=$(date "+%d %h %Y %H:%M:%S")
 DATE_AEST=$(TZ=Australia/Sydney date +"%d %h %Y")
 
 logInfo "Using the time '$DATE_AEST' for the email subject line and title"
@@ -312,7 +310,7 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
         "auto_tweet": false,
         "auto_fb_post": [],
         "fb_comments": false,
-        "template_id": '"$MAILCHIMP_TEMPLATE_ID"'
+        "template_id": '$MAILCHIMP_TEMPLATE_ID'
     },
         "content_type": "template"
     }')
@@ -324,35 +322,27 @@ logInfo "Email Campaign created successfully"
 
 #TODO: Fix scheduling 
 
-# $MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
+MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
-# # Lastly, schedule the new email Campaign to be sent
+# Lastly, schedule the new email Campaign to be sent
 
+TODAY=$(date -I)
+logDebug $TODAY
 
-# MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
-# "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
-# --user "anystring:${MAILCHIMP_API_KEY}" \
-#   -d '{
-#         "schedule_time": '"$MAILCHIMP_EMAIL_SEND_TIME"',
-#         "timewarp": false,
-#         "batch_delivery": { "batch_delay": 0, "batch_count": 0 }
-#     }')
-# EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
+MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_SEND_TIME_UTC+0000"
+logDebug "$MAILCHIMP_SCHEDULED_TIME"
 
-# logDebug "$MAILCHIMP_EMAIL_SCHEDULE"
-# testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
+MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
+"https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
+--user "anystring:${MAILCHIMP_API_KEY}" \
+  -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
+EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
 
-
-# else 
-#     logDebug "Debugging is enabled, skipping email creation..."
-# fi
+logDebug "$MAILCHIMP_EMAIL_SCHEDULE"
+testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
 
 # TODO:
-# 1. Test and escape DATE before passing to curl
-# 2. Populate $DATE in email title and send time
-# 2. Assign to valid mailing group segment 
-# 3. Schedule to send
-# 4. Confrim Campaign is created, check content within
+# 1. Confrim Campaign is created, check content within
 
 logInfo "$FULL_NAME completed successfully!"
 
