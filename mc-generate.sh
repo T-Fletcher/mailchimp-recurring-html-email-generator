@@ -155,9 +155,9 @@ function cleanUp() {
     # Track the daily success/failure of the script, in a place that isn't
     # affected by the cleanup steps
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE. See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     else
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully. See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
 
     if [[ ! -z $MAILCHIMP_TEMPLATE_ID && -z $DELETE_TEMPLATE_ON_CLEANUP || $DELETE_TEMPLATE_ON_CLEANUP == "true" ]]; then
@@ -229,8 +229,9 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
 fi
 
 DATE_AEST=$(TZ=Australia/Sydney date +"%d %h %Y")
+DATETIME_AEST=$(TZ=Australia/Sydney date +"%d %h %Y %H:%M:%S")
 
-logInfo "Using the time '$DATE_AEST' for the email subject line and title"
+logInfo "Using '$DATE_AEST' for the email subject line and '$DATETIME_AEST' for the email name."
 
 if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
@@ -242,7 +243,7 @@ else
     EXIT_CODE=$? receivedData 'HTML data'
 fi
 
-logDebug "Data:\n$HTML"
+logInfo "Data:\n$HTML"
 
 # logInfo "Checking HTML is valid..."
 # echo -e "$HTML" > "html.tmp"
@@ -257,15 +258,13 @@ HTML_ENCODED=$(echo -e $HTML | jq -R ".")
 EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 
 MAILCHIMP_CAMPAIGN_DATA='{
-    "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE_AEST"\"',
+    "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATETIME_AEST"\"',
     "folder_id": "",
     "html": '$HTML_ENCODED'
 }'
 
-if [[ $DEBUG == "true" ]]; then
-    logDebug "Data to be submitted to Mailchimp to generate the Campaign:"
-    logDebug $MAILCHIMP_CAMPAIGN_DATA
-fi
+logInfo "Data to be submitted to Mailchimp to generate the Campaign:"
+logInfo $MAILCHIMP_CAMPAIGN_DATA
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
 
@@ -298,7 +297,7 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
     "settings": {
         "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE_AEST"\"',
         "preview_text": "",
-        "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATE_AEST"\"',
+        "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATETIME_AEST"\"',
         "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
         "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
         "use_conversation": false,
@@ -320,32 +319,23 @@ testMailchimpResponse "$MAILCHIMP_EMAIL"
 
 logInfo "Email Campaign created successfully"
 
-#TODO: Fix scheduling 
-
 MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
 # Lastly, schedule the new email Campaign to be sent
 
 TODAY=$(date -I)
-logDebug $TODAY
 
 MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC+0000"
-logDebug "$MAILCHIMP_SCHEDULED_TIME"
+logInfo "Scheduled time in UTC: $MAILCHIMP_SCHEDULED_TIME"
 
 MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
 "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
 --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d '{
-        "schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'
-    }')
+  -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
 EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
 
-logDebug "$MAILCHIMP_EMAIL_SCHEDULE"
+logInfo "$MAILCHIMP_EMAIL_SCHEDULE"
 testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
 
-# TODO:
-# 1. Confrim Campaign is created, check content within
-
 logInfo "$FULL_NAME completed successfully!"
-
 exit 0
