@@ -62,6 +62,9 @@ function testMailchimpResponse() {
             logWarning "Received HTTP response '$responseStatus' from Mailchimp! Quitting..."
             logError "$response"
         fi
+    else 
+        logInfo "Response from Mailchimp:"
+        echo -e "$response"
     fi
 }
 
@@ -103,25 +106,26 @@ fi
 ROOT_DIR=$(pwd)
 FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
 URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
-DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
-MAILCHIMP_ACTIVITY_DIR="$ROOT_DIR/$URL_NAME"
+TEMP_DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
+MAILCHIMP_LOGS_DIR="$ROOT_DIR/$URL_NAME-logs"
 MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
-MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_ACTIVITY_DIR/$URL_NAME-output-$NOW.log"
+MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_LOGS_DIR/$URL_NAME-output-$NOW.log"
 TEST_DATA="../test/test-data.html"
 
-# Send script output to the logs, unless debug mode is enabled
-if [[ ! $DEBUG == "true" ]]; then
-    echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
-    exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
-else 
+if [[ ! -d $MAILCHIMP_LOGS_DIR ]]; then
+    mkdir $MAILCHIMP_LOGS_DIR
+fi
+
+# Send script output to the logs
+echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
+exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
+
+# Prefix 'TEST--' to emails if debugging is enabled
+if [[ $DEBUG == "true" ]]; then
     MAILCHIMP_EMAIL_SHORT_NAME=$(echo "TEST--$MAILCHIMP_EMAIL_SHORT_NAME")
 fi
 
 logInfo "$FULL_NAME starting..."
-
-if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
-    mkdir $MAILCHIMP_ACTIVITY_DIR
-fi
 
 if [[ -z $MAILCHIMP_SERVER_PREFIX || -z $MAILCHIMP_API_KEY || -z $EMAIL_CONTENT_URL || -z $MAILCHIMP_EMAIL_SHORT_NAME ]]; then
     logError "Required environment variables are missing.
@@ -159,46 +163,49 @@ function cleanUp() {
         logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully" >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
 
-    # Remove Mailchimp Templates created by the script, whether by testing or not
     if [[ ! -z $MAILCHIMP_TEMPLATE_ID && -z $DELETE_TEMPLATE_ON_CLEANUP || $DELETE_TEMPLATE_ON_CLEANUP == "true" ]]; then
+        logInfo "Removing Mailchimp Templates created by the script, whether by testing or not"
         curl -sX DELETE \
         "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
         --user "anystring:${MAILCHIMP_API_KEY}"
     fi
 
-    rm -rf $DIR;
-    rm -rf "$URL_NAME-logs*"
+    rm -rf $TEMP_DIR;
     rm -rf "html.tmp"
     
     logInfo "Clean up complete!"
     
     COMPLETE_TIME=$(date +%s)
     logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(date -u +"%Y%m%dT%H:%M:%S%z")"
-    code $MAILCHIMP_SCRIPT_LOGFILE
+    
+    if [[ $DEBUG == "true" ]]; then
+        logDebug "Opening log file from this run (requires 'code' alias to open your editor of choice)..."
+        code $MAILCHIMP_SCRIPT_LOGFILE
+    fi
 }
 
 # Test log locations exist
-if [[ ! -d $MAILCHIMP_ACTIVITY_DIR ]]; then
-    logError "$MAILCHIMP_ACTIVITY_DIR directory not found, quitting..." 6
+if [[ ! -d $MAILCHIMP_LOGS_DIR ]]; then
+    logError "$MAILCHIMP_LOGS_DIR directory not found, quitting..." 6
 fi
 
-if [[ -d $DIR ]]; then
-    logInfo "Log folder '$DIR' already exists, deleting it to start fresh..."
-    rm -rf $DIR
-    EXIT_CODE=$? replaceLogFolder $DIR
-    mkdir $DIR
+if [[ -d $TEMP_DIR ]]; then
+    logInfo "Log folder '$TEMP_DIR' already exists, deleting it to start fresh..."
+    rm -rf $TEMP_DIR
+    EXIT_CODE=$? replaceLogFolder $TEMP_DIR
+    mkdir $TEMP_DIR
 else
-    logInfo "Log folder not found, creating '$DIR'..."
-    mkdir $DIR
+    logInfo "Log folder not found, creating '$TEMP_DIR'..."
+    mkdir $TEMP_DIR
 fi
 
-if [[ ! -d $DIR ]]; then
-    logError "No $DIR found, quitting..." 3
+if [[ ! -d $TEMP_DIR ]]; then
+    logError "No $TEMP_DIR found, quitting..." 3
 fi
 
-cd $DIR
+cd $TEMP_DIR
 
-logInfo "Switching to $DIR"
+logInfo "Switching to $TEMP_DIR"
 
 # Set the required Mailchimp API variables
 MAILCHIMP_SERVER_PREFIX=$MAILCHIMP_SERVER_PREFIX
@@ -256,20 +263,21 @@ EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 HTML_ENCODED="'${HTML_ENCODED:1:-1}'"
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
+
+#TODO: Template code includes single quote wrappers, fix this...
+
 MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
   -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE_AEST\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
-logDebug "$MAILCHIMP_CREATE_TEMPLATE"
-
 testMailchimpResponse "$MAILCHIMP_CREATE_TEMPLATE"
 
 MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
 EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 
-
+logInfo "Creating new Email Campaign from the new Template..."
 # Only create the email campaign if debugging is disabled
 # if [[ ! $DEBUG == "true" ]]; then
 
@@ -305,9 +313,30 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
     }')
 EXIT_CODE=$? receivedData 'Email Campaign creation response'
 
-logDebug "$MAILCHIMP_EMAIL"
-
 testMailchimpResponse "$MAILCHIMP_EMAIL"
+
+logInfo "Email Campaign created successfully"
+
+#TODO: Fix scheduling 
+
+# $MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
+
+# # Lastly, schedule the new email Campaign to be sent
+
+
+# MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
+# "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
+# --user "anystring:${MAILCHIMP_API_KEY}" \
+#   -d '{
+#         "schedule_time": '"$MAILCHIMP_EMAIL_SEND_TIME"',
+#         "timewarp": false,
+#         "batch_delivery": { "batch_delay": 0, "batch_count": 0 }
+#     }')
+# EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
+
+# logDebug "$MAILCHIMP_EMAIL_SCHEDULE"
+# testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
+
 
 # else 
 #     logDebug "Debugging is enabled, skipping email creation..."
