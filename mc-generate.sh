@@ -280,8 +280,6 @@ MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
 EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
 
 logInfo "Creating new Email Campaign from the new Template..."
-# Only create the email campaign if debugging is disabled
-# if [[ ! $DEBUG == "true" ]]; then
 
 #* See list of all Campaign options: 
 #* https://mailchimp.com/developer/marketing/api/campaigns/add-campaign/
@@ -325,16 +323,20 @@ MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
 TODAY=$(date -I)
 
-MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC+0000"
-logInfo "Scheduled time in UTC: $MAILCHIMP_SCHEDULED_TIME"
+# Only schedule the email campaign if debugging is disabled
+# This prevents test content accidentally being sent
+if [[ ! $DEBUG == "true" ]]; then
+    MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC+0000"
+    logInfo "Scheduled time in UTC: $MAILCHIMP_SCHEDULED_TIME"
 
-MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
-"https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
---user "anystring:${MAILCHIMP_API_KEY}" \
-  -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
-EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
+    MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
+    "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
+    --user "anystring:${MAILCHIMP_API_KEY}" \
+    -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
+    EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
 
-logInfo "$MAILCHIMP_EMAIL_SCHEDULE"
+    logInfo "$MAILCHIMP_EMAIL_SCHEDULE"
+fi
 testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
 
 logInfo "$FULL_NAME completed successfully!"
