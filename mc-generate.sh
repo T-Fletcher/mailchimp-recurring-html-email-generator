@@ -329,13 +329,15 @@ MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 TODAY=$(date -I)
 logDebug $TODAY
 
-MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_SEND_TIME_UTC+0000"
+MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC+0000"
 logDebug "$MAILCHIMP_SCHEDULED_TIME"
 
 MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
 "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
 --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
+  -d '{
+        "schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'
+    }')
 EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
 
 logDebug "$MAILCHIMP_EMAIL_SCHEDULE"
