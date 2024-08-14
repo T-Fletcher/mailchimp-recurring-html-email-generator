@@ -22,19 +22,16 @@ function logError() {
 }
 
 function logInfo() {
-    local message=$1
-    echo -e "[INFO] - $message"
+    echo -e "[INFO] - $@"
 }
 
 function logWarning() {
-    local message=$1
-    echo -e "[WARNING] - $message"
+    echo -e "[WARNING] - $@"
 }
 
 function logDebug() {
-    local message=$1
     if [[ $DEBUG == "true" ]]; then
-        echo -e "[DEBUG] - $message"
+        echo -e "[DEBUG] - $@"
     fi
 }
 
@@ -256,20 +253,28 @@ logDebug "Data:\n$HTML"
 # EXIT_CODE=$? tidyErrors html_errors.tmp
 
 logInfo "Encoding HTML data as a JSON-safe string"
-HTML_ENCODED=$(jq -Rs <<< "$HTML")
+#! Do not use jq's -s option (--slurp) to grab the HTML as a single string!
+#! It adds a line break at the end of the string that breaks the JSON string.
+HTML_ENCODED=$(echo -e $HTML | jq -R ".")
 EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 
-# Replace the quote wrappers with single quotes so it's valid JSON for Mailchimp
-HTML_ENCODED="'${HTML_ENCODED:1:-1}'"
+MAILCHIMP_CAMPAIGN_DATA='{
+    "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE_AEST"\"',
+    "folder_id": "",
+    "html": '$HTML_ENCODED'
+}'
+
+if [[ $DEBUG == "true" ]]; then
+    logDebug "Data to be submitted to Mailchimp to generate the Campaign:"
+    logDebug $MAILCHIMP_CAMPAIGN_DATA
+fi
 
 logInfo "Submitting encoded HTML data to Mailchimp to create a new Template..."
-
-#TODO: Template code includes single quote wrappers, fix this...
 
 MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
-  -d "{\"name\":\"$MAILCHIMP_EMAIL_SHORT_NAME template - $DATE_AEST\",\"folder_id\":\"\",\"html\": \"$HTML_ENCODED\"}")
+  -d "${MAILCHIMP_CAMPAIGN_DATA}")
 EXIT_CODE=$? receivedData 'Template creation response'
 
 testMailchimpResponse "$MAILCHIMP_CREATE_TEMPLATE"
