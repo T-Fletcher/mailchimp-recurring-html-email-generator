@@ -239,8 +239,13 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     HTML=$(<$TEST_DATA)
     EXIT_CODE=$? receivedData 'HTML test data'
 else
-    logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
-    HTML=$(curl -s "$EMAIL_CONTENT_URL")
+    if [[ ! -z $INCLUDE_CACHEBUSTER && $INCLUDE_CACHEBUSTER == "true" ]]; then
+        logInfo "Sourcing data from '$EMAIL_CONTENT_URL?$NOW_EPOCH'"
+        HTML=$(curl -s "$EMAIL_CONTENT_URL?$NOW_EPOCH")
+    else
+        logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
+        HTML=$(curl -s "$EMAIL_CONTENT_URL")
+    fi
     EXIT_CODE=$? receivedData 'HTML data'
 fi
 
