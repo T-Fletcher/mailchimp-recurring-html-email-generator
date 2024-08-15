@@ -159,6 +159,9 @@ function cleanUp() {
     else
         logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully. See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
+    
+    rm -rf $TEMP_DIR;
+    rm -rf "html.tmp"
 
     if [[ ! -z $MAILCHIMP_TEMPLATE_ID && -z $DELETE_TEMPLATE_ON_CLEANUP || $DELETE_TEMPLATE_ON_CLEANUP == "true" ]]; then
         logInfo "Removing Mailchimp Templates created by the script, whether by testing or not"
@@ -167,8 +170,6 @@ function cleanUp() {
         --user "anystring:${MAILCHIMP_API_KEY}"
     fi
 
-    rm -rf $TEMP_DIR;
-    rm -rf "html.tmp"
     
     logInfo "Clean up complete!"
     

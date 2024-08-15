@@ -17,8 +17,8 @@ else
 fi
 
 
-AUDIENCE_FILENAME="mc-data-audience-ids.txt"
-FOLDER_FILENAME="mc-data-folder-ids.txt"
+AUDIENCE_FILENAME="mailchimp-data-audience-ids.txt"
+FOLDER_FILENAME="mailchimp-data-folder-ids.txt"
 
 # Get Mailchimp Audience list
 
