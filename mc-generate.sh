@@ -174,9 +174,9 @@ function cleanUp() {
     # Track the daily success/failure of the script, in a place that isn't
     # affected by the cleanup steps
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE. See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     else
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully. See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
     
     rm -rf $TEMP_DIR;
@@ -344,15 +344,21 @@ logInfo "Email Campaign created successfully"
 
 MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
-# Lastly, schedule the new email Campaign to be sent
+# Lastly, schedule the new Email Campaign to be sent
 
-TODAY=$(date -I)
+TODAY=$(date -u +"%Y-%m-%d")
 
-# Only schedule the email campaign if debugging is disabled
+# Only schedule the Email Campaign if debugging is disabled
 # This prevents test content accidentally being sent
 if [[ ! $DEBUG == "true" ]]; then
-    MAILCHIMP_SCHEDULED_TIME="$TODAYT$MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC+0000"
-    logInfo "Scheduled time in UTC: $MAILCHIMP_SCHEDULED_TIME"
+
+    MAILCHIMP_SCHEDULED_TIME="${TODAY}T${MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC}+0000"
+    logInfo "Scheduled send time in UTC: $MAILCHIMP_SCHEDULED_TIME"
+
+    logInfo "Checking '$MAILCHIMP_SCHEDULED_TIME' is in the future (unless you're Marty McFly)..."
+    hasDatePassed $MAILCHIMP_SCHEDULED_TIME
+
+    logInfo "Scheduling the new Email Campaign..."
 
     MAILCHIMP_EMAIL_SCHEDULE=$(curl -sX POST \
     "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
