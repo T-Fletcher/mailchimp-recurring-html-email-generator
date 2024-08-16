@@ -4,12 +4,17 @@
 
 # ====================
 # Author: Tim Fletcher
-# Date: 2024-08-09
+# Date: 2024-08-16
 # Licence: GPL-3.0
 # Source location: https://github.com/T-Fletcher/mailchimp-recurring-html-email-generator
 # ====================
 
-# NOTE: Times are in UTC
+# @TODO:
+#
+# 1. Validate incoming HTML via Tidy
+# 2. Expand scheduling options to include weekly, fortnightly and monthly
+
+# NOTE: All times are in UTC
 NOW=$(date -u +"%Y%m%dT%H:%M:%S%z")
 NOW_EPOCH=$(date +%s)
 
@@ -255,6 +260,7 @@ logInfo "Using '$DATE_AEST' for the email subject line and '$DATETIME_AEST' for 
 
 if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
+    logWarning "Note if $TEST_DATA contains broken HTML, unexpected things may happen..."
     HTML=$(<$TEST_DATA)
     EXIT_CODE=$? receivedData 'HTML test data'
 else
@@ -269,6 +275,8 @@ else
 fi
 
 logInfo "Data:\n$HTML"
+
+# TODO: HTML validation before proceeding with template generation
 
 # logInfo "Checking HTML is valid..."
 # echo -e "$HTML" > "html.tmp"
