@@ -88,6 +88,25 @@ function tidyErrors() {
     fi
 }
 
+function isDateValidISO8601() {
+    date -j -f "%Y-%m-%dT%H:%M:%S%z" $1 +"%Y%m%dT%H:%M:%S%z"
+    EXIT_CODE=$? 
+
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Invalid ISO 8601 date format: '$1', expected 'Y-m-dTH:M:Sz'" 1
+    fi
+}
+
+function hasDatePassed() {
+    isDateValidISO8601 $1
+    local NOW=$(date -u +"%s");
+    local DATE_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" $1 +"%s");
+
+    if [[ $DATE_EPOCH -gt $NOW ]]; then
+        logError "'$1' is in the past, quitting..." 1
+    fi
+}
+
 # Load env variables before doing anything else
 if [[ -f ".env" ]]; then
     source ".env"
