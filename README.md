@@ -16,6 +16,7 @@ This script is for for Mailchimp users who want to:
   - [Quick start](#quick-start)
   - [How it works](#how-it-works)
   - [When is this useful?](#when-is-this-useful)
+  - [Gotchas](#gotchas)
   - [Testing and debugging](#testing-and-debugging)
   - [Environment variables](#environment-variables)
 
@@ -37,6 +38,7 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 **Required:**
 
 - bash
+- GNU date, or gdate - not BSD date
 - jq 1.7+ (earlier versions may work, untested)
 - curl
 - An active Mailchimp account
@@ -84,6 +86,10 @@ Generating a new Mailchimp Template by flushing Drupal's cache (if you're using 
 
 > Note that if the content you wish to email will never be updated more frequently than every few days, the Mailchimp cache issue may not be a problem and Journeys are the way to go - you won't need to run this script on a server somewhere.
 
+
+## Gotchas
+
+This is written to run in environments with access to GNU `date` or `gdate` (available on MacOS via the `coreutils` brew package). If you're running in a Unix environment without GNU `date` or `gdate`, `date` commands may fail due to incompatible flags.
 
 ## Testing and debugging
 

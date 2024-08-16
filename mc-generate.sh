@@ -13,10 +13,28 @@
 #
 # 1. Validate incoming HTML via Tidy
 # 2. Expand scheduling options to include weekly, fortnightly and monthly
+# 3. Map out Exit codes in README
+
+function useDate() {
+    if date --version >/dev/null 2>&1 ; then
+        # OS uses GNU date
+        date "$@"
+    else
+        # OS uses non-GNU date, sending date command to gdate
+        # https://apple.stackexchange.com/questions/231224/how-to-have-gnus-date-in-os-x
+        gdate --version >/dev/null 2>&1
+        EXIT_CODE=$?
+        if [[ $EXIT_CODE -ne 0 ]]; then
+            logWarning "GNU date not found, date commands may not work as expected"
+            logWarning "See https://apple.stackexchange.com/questions/231224/how-to-have-gnus-date-in-os-x"
+        fi
+        gdate "$@"
+    fi
+}
 
 # NOTE: All times are in UTC
-NOW=$(date -u +"%Y%m%dT%H:%M:%S%z")
-NOW_EPOCH=$(date +%s)
+NOW=$(useDate -u +"%Y%m%dT%H:%M:%S%z")
+NOW_EPOCH=$(useDate +%s)
 
 # Better logging
 function logError() {
@@ -93,22 +111,33 @@ function tidyErrors() {
     fi
 }
 
-function isDateValidISO8601() {
-    date -j -f "%Y-%m-%dT%H:%M:%S%z" $1 +"%Y%m%dT%H:%M:%S%z"
+function isDateValidISO8601() {    
+    useDate "+%Y-%m-%dT%H:%M:%S%z" -d $1
     EXIT_CODE=$? 
 
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Invalid ISO 8601 date format: '$1', expected 'Y-m-dTH:M:Sz'" 1
+        logWarning "Invalid ISO 8601 date format: '$1', expected 'Y-m-dTH:M:Sz'"
+        return 1
+    else 
+        return 0
     fi
 }
 
 function hasDatePassed() {
     isDateValidISO8601 $1
-    local NOW=$(date -u +"%s");
-    local DATE_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" $1 +"%s");
+    EXIT_CODE=$? 
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logError "Invalid date provided, quitting..."
+    fi
 
-    if [[ $DATE_EPOCH -gt $NOW ]]; then
-        logError "'$1' is in the past, quitting..." 1
+    local NOW=$(useDate -u +%s);
+    local GIVEN_DATE=$(useDate -d $1 +%s);
+
+    if [[ $GIVEN_DATE -lt $NOW ]]; then
+        logWarning "'$1' is in the past!"
+        return 1
+    else 
+        return 0
     fi
 }
 
@@ -179,9 +208,9 @@ function cleanUp() {
     # Track the daily success/failure of the script, in a place that isn't
     # affected by the cleanup steps
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     else
-        logInfo "$(date -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
     
     rm -rf $TEMP_DIR;
@@ -197,13 +226,25 @@ function cleanUp() {
     
     logInfo "Clean up complete!"
     
-    COMPLETE_TIME=$(date +%s)
-    logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(date -u +"%Y%m%dT%H:%M:%S%z")"
+    COMPLETE_TIME=$(useDate +%s)
+    logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(useDate -u +"%Y%m%dT%H:%M:%S%z")"
     
     if [[ $DEBUG == "true" ]]; then
         logDebug "Opening log file from this run (requires 'code' alias to open your editor of choice)..."
         code $MAILCHIMP_SCRIPT_LOGFILE
     fi
+    return 0
+}
+
+function cleanUpAndDeleteEmail() {
+    EMAIL_ID=$1
+    logInfo "Deleting Email Campaign before running regular cleanup..."
+
+    curl -sX DELETE \
+    "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$EMAIL_ID" \
+    --user "anystring:${MAILCHIMP_API_KEY}"
+
+    cleanUp
 }
 
 # Test log locations exist
@@ -253,8 +294,8 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     sleep 10
 fi
 
-DATE_AEST=$(TZ=Australia/Sydney date +"%d %h %Y")
-DATETIME_AEST=$(TZ=Australia/Sydney date +"%d %h %Y %H:%M:%S")
+DATE_AEST=$(TZ=Australia/Sydney useDate +"%d %h %Y")
+DATETIME_AEST=$(TZ=Australia/Sydney useDate +"%d %h %Y %H:%M:%S")
 
 logInfo "Using '$DATE_AEST' for the email subject line and '$DATETIME_AEST' for the email name."
 
@@ -354,7 +395,7 @@ MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
 # Lastly, schedule the new Email Campaign to be sent
 
-TODAY=$(date -u +"%Y-%m-%d")
+TODAY=$(useDate -u +"%Y-%m-%d")
 
 # Only schedule the Email Campaign if debugging is disabled
 # This prevents test content accidentally being sent
@@ -365,6 +406,12 @@ if [[ ! $DEBUG == "true" ]]; then
 
     logInfo "Checking '$MAILCHIMP_SCHEDULED_TIME' is in the future (unless you're Marty McFly)..."
     hasDatePassed $MAILCHIMP_SCHEDULED_TIME
+    EXIT_CODE=$?
+
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        logWarning "Email Campaign scheduling failed, deleting the Email Campaign and quitting..."
+        cleanUpAndDeleteEmail $MAILCHIMP_EMAIL_ID
+    fi
 
     logInfo "Scheduling the new Email Campaign..."
 
