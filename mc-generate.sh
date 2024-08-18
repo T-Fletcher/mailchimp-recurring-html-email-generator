@@ -229,7 +229,8 @@ function cleanUp() {
     COMPLETE_TIME=$(useDate +%s)
     logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(useDate -u +"%Y%m%dT%H:%M:%S%z")"
     
-    if [[ $DEBUG == "true" ]] && ! code >/dev/null 2>&1; then
+    if [[ $DEBUG == "true" ]]; then
+        if ! code >/dev/null 2>&1; then
             logDebug "Opening log file from this run (requires 'code' alias to open your editor of choice)..."
             code $MAILCHIMP_SCRIPT_LOGFILE
         fi
