@@ -397,13 +397,12 @@ MAILCHIMP_EMAIL_ID=$(echo -e "$MAILCHIMP_EMAIL" | jq -r ".id")
 
 TODAY=$(useDate -u +"%Y-%m-%d")
 
-# Only schedule the Email Campaign if debugging is disabled
-# This prevents test content accidentally being sent
-if [[ ! $DEBUG == "true" ]]; then
-
     MAILCHIMP_SCHEDULED_TIME="${TODAY}T${MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC}+0000"
     logInfo "Scheduled send time in UTC: $MAILCHIMP_SCHEDULED_TIME"
 
+# Only schedule the Email Campaign if debugging is disabled
+# This prevents test content accidentally being sent
+if [[ ! $DEBUG == "true" ]]; then
     logInfo "Checking '$MAILCHIMP_SCHEDULED_TIME' is in the future (unless you're Marty McFly)..."
     hasDatePassed $MAILCHIMP_SCHEDULED_TIME
     EXIT_CODE=$?
@@ -422,6 +421,8 @@ if [[ ! $DEBUG == "true" ]]; then
     EXIT_CODE=$? receivedData 'Email Campaign scheduling response'
 
     logInfo "$MAILCHIMP_EMAIL_SCHEDULE"
+else 
+    logInfo "DEBUG mode enabled, skipping scheduling email for $MAILCHIMP_SCHEDULED_TIME UTC."
 fi
 testMailchimpResponse "$MAILCHIMP_EMAIL_SCHEDULE"
 
