@@ -165,7 +165,7 @@ TIMEZONE                                - string - optional
     Defaults to UTC if no code is
     provided
 
-INCLUDE_CACHEBUSTER                     - boolean - optional
+INCLUDE_CACHEBUSTER                     - boolean - false - optional
     Whether to include a timestamp
     cachebuster in the URL to prevent
     HMTL email content caching

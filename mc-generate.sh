@@ -26,14 +26,6 @@ else
     You can create one by copying '.env.example'." 1;
 fi
 
-if [[ -z $TIMEZONE ]]; then
-    echo "No timezone specified, defaulting to UTC"
-    TIMEZONE="UTC"
-else 
-    echo -e "Timezone set to: $TIMEZONE"
-fi
-
-
 function useDate() {
     if date --version >/dev/null 2>&1 ; then
         # OS uses GNU date
@@ -202,6 +194,17 @@ if [[ -z $MAILCHIMP_SERVER_PREFIX || -z $MAILCHIMP_API_KEY || -z $EMAIL_CONTENT_
     See '.env.example' for required variables." 2;
 fi
 
+if [[ -z $TIMEZONE ]]; then
+    logWarning "No TZ code in TIMEZONE environment variable is not set, defaulting to UTC"
+    TIMEZONE="UTC"
+else 
+    echo -e "Timezone set to: $TIMEZONE"
+fi
+
+if [[ -z $MAILCHIMP_EMAIL_DAILY_SEND_TIME ]]; then
+    logError "No send time set in MAILCHIMP_EMAIL_DAILY_SEND_TIME environment variable, quitting..." 3
+fi
+
 if [[ -z $MAILCHIMP_TARGET_AUDIENCE_ID ]]; then
     logWarning "Target Mailchimp Audience ID environment variable is missing! 
     The Template will still be generated but no emails will be created or sent."
@@ -209,10 +212,21 @@ fi
 
 if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
     logWarning "Terminus site environment variable is not set!
-    Let's assume your URL isn't from a Pantheon Drupal website.
-    You can proceed but will need to handle clearing your
-    website's cache some other way, or you may recieve stale data.";
+    Let's assume your URL isn't from a Pantheon Drupal website."
+    if [[ -z $INCLUDE_CACHEBUSTER ]]; then
+        logWarning "You apparently aren't using Pantheon Drupal OR including a cachebuster suffix. 
+        You can proceed but will need to handle clearing your website's 
+        cache some other way, or you may recieve stale data."
+    logWarning "You can add a timestamp cachebuster to the initial HTML data curl request 
+        by setting INCLUDE_CACHEBUSTER=\"true\" in your environment variables"
+    fi
 fi
+
+if [[ ! -z $INCLUDE_CACHEBUSTER && $INCLUDE_CACHEBUSTER == "true" ]]; then
+    logInfo "Adding a cachebuster suffix to the initial HTML data curl request"
+    EMAIL_CONTENT_URL="${EMAIL_CONTENT_URL}?cachebuster=$(useDate +%s)"
+fi
+
 
 trap cleanUp EXIT
 
@@ -313,24 +327,19 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     sleep 10
 fi
 
-DATE_AEST=$(TZ=Australia/Sydney useDate +"%d %h %Y")
-DATETIME_AEST=$(TZ=Australia/Sydney useDate +"%d %h %Y %H:%M:%S")
+DATE=$(useDate +"%d %h %Y")
+DATETIME=$(useDate +"%d %h %Y %H:%M:%S")
 
-logInfo "Using '$DATE_AEST' for the email subject line and '$DATETIME_AEST' for the email name."
+logInfo "Using '$DATE' for the email subject line and '$DATETIME' for the email name."
 
 if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
     logWarning "Note if $TEST_DATA contains broken HTML, unexpected things may happen..."
     HTML=$(<$TEST_DATA)
     EXIT_CODE=$? receivedData 'HTML test data'
-else
-    if [[ ! -z $INCLUDE_CACHEBUSTER && $INCLUDE_CACHEBUSTER == "true" ]]; then
-        logInfo "Sourcing data from '$EMAIL_CONTENT_URL?$NOW_EPOCH'"
-        HTML=$(curl -s "$EMAIL_CONTENT_URL?$NOW_EPOCH")
-    else
-        logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
-        HTML=$(curl -s "$EMAIL_CONTENT_URL")
-    fi
+else    
+    logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
+    HTML=$(curl -s "$EMAIL_CONTENT_URL")
     EXIT_CODE=$? receivedData 'HTML data'
 fi
 
@@ -351,7 +360,7 @@ HTML_ENCODED=$(echo -e $HTML | jq -R ".")
 EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
 
 MAILCHIMP_CAMPAIGN_DATA='{
-    "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATETIME_AEST"\"',
+    "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATETIME"\"',
     "folder_id": "",
     "html": '$HTML_ENCODED'
 }'
@@ -387,9 +396,9 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
         "list_id": '\""$MAILCHIMP_TARGET_AUDIENCE_ID"\"'
     },
     "settings": {
-        "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE_AEST"\"',
+        "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE"\"',
         "preview_text": "",
-        "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATETIME_AEST"\"',
+        "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATETIME"\"',
         "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
         "reply_to": '\""$MAILCHIMP_EMAIL_REPLYTO"\"',
         "use_conversation": false,
