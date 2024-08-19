@@ -71,20 +71,30 @@ function testMailchimpResponse() {
     #* https://mailchimp.com/developer/marketing/docs/errors/
 
     local response=$@
+
+    if [[ "$@" == "" && -z $1 ]];then
+        logInfo "Successful empty response received from Mailchimp"
+        return 0
+    fi
+
     local responseType=$(jq -r ".type" <<<$response)
     local responseStatus=$(jq -r ".status" <<<$response)
 
     if [[ $reponseType == 'https://mailchimp.com/developer/marketing/docs/errors/' ]];then
         logError "Error response received from MailChimp, quitting..." $response
+        return 1
         # If the response status is a number AND a non-200 HTTP code
     elif [[ $responseStatus =~ ^[0-9]+$ ]]; then
         if [[ $responseStatus -lt 200 || $responseStatus -gt 299 ]]; then
             logWarning "Received HTTP response '$responseStatus' from Mailchimp! Quitting..."
             logError "$response"
+            return 1
         fi
+        return 0
     else 
         logInfo "Response from Mailchimp:"
         echo -e "$response"
+        return 0
     fi
 }
 
