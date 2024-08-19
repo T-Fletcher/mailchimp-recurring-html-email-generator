@@ -6,7 +6,7 @@ This script is for for Mailchimp users who want to:
 
 1. Manage their email content as a HTML webpage (such as via a CMS), and
 2. Ensure their email contains the latest content every time, and
-3. Send it to a specific Audience as a recurring email.
+3. Send it to a specific Audience as a recurring email at a certain time.
 
 ## Contents
 - [Mailchimp recurring HTML email generator](#mailchimp-recurring-html-email-generator)
@@ -17,6 +17,8 @@ This script is for for Mailchimp users who want to:
   - [How it works](#how-it-works)
   - [When is this useful?](#when-is-this-useful)
   - [Gotchas](#gotchas)
+    - [Date flags](#date-flags)
+    - [Scheduling for midnight in UTC](#scheduling-for-midnight-in-utc)
   - [Testing and debugging](#testing-and-debugging)
   - [Environment variables](#environment-variables)
 
@@ -26,7 +28,7 @@ It automates the process of creating a regular email campaign in Mailchimp's UI 
 
 If you're using Pantheon Drupal, it integrates with Terminus to clear the cache before fetching the HTML data. If not, you can use the `INCLUDE_CACHEBUSTER` flag or handle cache clearing yourself.
 
-To make the email recurring e.g. hourly, daily, weekly etc, you can schedule the script to run periodically via a daily `cron` task. Note that the send time (`MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC`) must be one of 15 minute intervals for Mailchimp to schedule it i.e. `00:00`, `00:15`, `00:30`, `00:45` etc.
+To make the email recurring e.g. hourly, daily, weekly etc, you can schedule the script to run periodically via a daily `cron` task. Note that the send time (`MAILCHIMP_EMAIL_DAILY_SEND_TIME`) must be one of 15 minute intervals for Mailchimp to schedule it i.e. `00:00`, `00:15`, `00:30`, `00:45` etc.
 
 > The scheduled time the email is sent will be applied to whatever day the script is run, and only if it's in the future - running this script at 10am to schedule a 9am email won't work.
 
@@ -89,7 +91,16 @@ Generating a new Mailchimp Template by flushing Drupal's cache (if you're using 
 
 ## Gotchas
 
+### Date flags
+
 This is written to run in environments with access to GNU `date` or `gdate` (available on MacOS via the `coreutils` brew package). If you're running in a Unix environment without GNU `date` or `gdate`, `date` commands may fail due to incompatible flags.
+
+### Scheduling for midnight in UTC
+
+If you're using UTC as your timezone: Attempting to schedule an email for a local time that falls on midnight in UTC e.g. `10am AEST` can be problematic, as the scheduling date string will get the current date, then set the time as `00:00:00` - the start of the day in which this script is running.
+
+This means the scheduled date will be in the past and will be rejected by Mailchimp. The easiest way around this is to schedule your email for a time other than midnight UTC, or to specify your local timezone. 
+
 
 ## Testing and debugging
 
@@ -141,9 +152,18 @@ MAILCHIMP_EMAIL_TITLE                   - string
 MAILCHIMP_EMAIL_SUBJECT                 - string
     The email subject line
 
-MAILCHIMP_EMAIL_DAILY_SEND_TIME_UTC     - string - optional
-    The time to send the email in
-    UTC, e.g. 10:00
+MAILCHIMP_EMAIL_DAILY_SEND_TIME         - string - optional
+    The time to send the email, in 
+    15 minute intervals 
+    e.g. 10:00:00, 02:45:00 etc.
+    Defaults to UTC if no TIMEZONE
+    is given
+
+TIMEZONE                                - string - optional
+    The TZ code to use for the 
+    script times e.g. Australia/Sydney.
+    Defaults to UTC if no code is
+    provided
 
 INCLUDE_CACHEBUSTER                     - boolean - optional
     Whether to include a timestamp
