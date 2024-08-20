@@ -155,7 +155,8 @@ function hasDatePassed() {
     local NOW=$(useDate -u +%s);
     local GIVEN_DATE=$(useDate -d $1 +%s);
 
-    if [[ $GIVEN_DATE -lt $NOW ]]; then
+    # Check if NOW is greater, so it fails if an invalid date is passed in
+    if [[ $NOW -gt $GIVEN_DATE ]]; then
         logWarning "'$1' is in the past!"
         return 1
     else 
@@ -271,9 +272,9 @@ function cleanUp() {
     return 0
 }
 
-function cleanUpAndDeleteEmail() {
+function deleteEmail() {
     EMAIL_ID=$1
-    logInfo "Deleting Email Campaign before running regular cleanup..."
+    logInfo "Deleting Email Campaign..."
 
     curl -sX DELETE \
     "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$EMAIL_ID" \
@@ -437,10 +438,24 @@ if [[ ! $DEBUG == "true" ]]; then
     hasDatePassed $MAILCHIMP_SCHEDULED_TIME
     EXIT_CODE=$?
 
+
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logWarning "Email Campaign scheduling failed, deleting the Email Campaign and quitting..."
-        cleanUpAndDeleteEmail $MAILCHIMP_EMAIL_ID
-        exit 1
+        # Note certain times will always appear to have passed relative to when
+        # the script is run e.g. 7:00 UTC will always fail if the script runs at
+        # 8:00 UTC. In these cases, we add +1 day as it's assumed it's meant for 
+        # the following day
+        logWarning "Email Campaign scheduled date is in the past, adding +1 day so it schedules for tomorrow..."
+        MAILCHIMP_SCHEDULED_TIME=$(useDate -d "$MAILCHIMP_SCHEDULED_TIME +1 day" +"%Y-%m-%dT%H:%M:%S%z")
+        logInfo "New scheduled date: '$MAILCHIMP_SCHEDULED_TIME'"
+        
+        hasDatePassed $MAILCHIMP_SCHEDULED_TIME
+        EXIT_CODE=$?
+
+        if [[ $EXIT_CODE -ne 0 ]]; then
+            logWarning "$MAILCHIMP_SCHEDULED_TIME still in the past! Quitting..."
+            deleteEmail $MAILCHIMP_EMAIL_ID
+            exit 1
+        fi
     fi
 
     logInfo "Scheduling the new Email Campaign..."
@@ -452,10 +467,9 @@ if [[ ! $DEBUG == "true" ]]; then
     EXIT_CODE=$? receivedData "Mailchimp email schedule"
 
     testMailchimpResponse $MAILCHIMP_EMAIL_SCHEDULE
-    EXIT_CODE=$? receivedData "Mailchimp scheduling response"
 
-    logInfo "$MAILCHIMP_EMAIL_SCHEDULE"
-else 
+    logInfo "Email Campaign scheduled successfully!"
+else
     logInfo "DEBUG mode enabled, skipping scheduling email."
 fi
 

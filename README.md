@@ -18,7 +18,7 @@ This script is for for Mailchimp users who want to:
   - [When is this useful?](#when-is-this-useful)
   - [Gotchas](#gotchas)
     - [Date flags](#date-flags)
-    - [Scheduling for midnight in UTC](#scheduling-for-midnight-in-utc)
+    - [Scheduling emails for times that land in the past](#scheduling-emails-for-times-that-land-in-the-past)
   - [Testing and debugging](#testing-and-debugging)
   - [Environment variables](#environment-variables)
 
@@ -66,7 +66,7 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 <!-- TODO: 2. It parses the HTML response and ensures it's valid -->
 3. It creates a Mailchimp email Template containing the HTML data via the Mailchimp API
 4. It creates a new Mailchimp Campaign using the new Template, and optionally saves it under an Campaign folder (if you've specified one)
-5. It schedules it to send to your nominated Mailchimp Audience at a time of your choosing
+5. It schedules it to send to your nominated Mailchimp Audience at a time of your choosing (must be in 15 minute increments, see [Introduction](#introduction))
 6. It cleans up all script artifacts and deletes the new Template since they're single use
 
 
@@ -95,12 +95,11 @@ Generating a new Mailchimp Template by flushing Drupal's cache (if you're using 
 
 This is written to run in environments with access to GNU `date` or `gdate` (available on MacOS via the `coreutils` brew package). If you're running in a Unix environment without GNU `date` or `gdate`, `date` commands may fail due to incompatible flags.
 
-### Scheduling for midnight in UTC
+### Scheduling emails for times that land in the past
 
-If you're using UTC as your timezone: Attempting to schedule an email for a local time that falls on midnight in UTC e.g. `10am AEST` can be problematic, as the scheduling date string will get the current date, then set the time as `00:00:00` - the start of the day in which this script is running.
+Before attempting to schedule the email in Mailchimp, the script tests if the scheduled email time is in the past. If it is, it assumes the schedule is intended for tomorrow and will add `+1 day` then test it again. 
 
-This means the scheduled date will be in the past and will be rejected by Mailchimp. The easiest way around this is to schedule your email for a time other than midnight UTC, or to specify your local timezone. 
-
+This is handles not knowing when a user may want to run the script, including when they are testing.
 
 ## Testing and debugging
 
