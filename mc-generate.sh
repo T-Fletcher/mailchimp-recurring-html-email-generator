@@ -75,6 +75,9 @@ function receivedData() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
         logError "Failed to get $message" $EXIT_CODE
+        return 1
+    else 
+        return 0
     fi
 }
 
@@ -340,7 +343,7 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     EXIT_CODE=$? receivedData 'HTML test data'
 else    
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
-    HTML=$(curl -s "$EMAIL_CONTENT_URL")
+    HTML=$(curl -sf "$EMAIL_CONTENT_URL")
     EXIT_CODE=$? receivedData 'HTML data'
 fi
 
