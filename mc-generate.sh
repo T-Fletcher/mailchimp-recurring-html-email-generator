@@ -19,7 +19,7 @@
 if [[ -f ".env" ]]; then
     source ".env"
     if [[ $DEBUG == "true" ]]; then
-        logDebug "DEBUG mode is enabled"
+        echo -e "DEBUG mode is enabled"
     fi
 else
     logError "Environment variable file '.env' does not exist.
@@ -202,7 +202,7 @@ if [[ -z $TIMEZONE ]]; then
     logWarning "No TZ code in TIMEZONE environment variable is not set, defaulting to UTC"
     TIMEZONE="UTC"
 else 
-    echo -e "Timezone set to: $TIMEZONE"
+    logInfo "Timezone set to: $TIMEZONE"
 fi
 
 if [[ -z $MAILCHIMP_EMAIL_DAILY_SEND_TIME ]]; then
