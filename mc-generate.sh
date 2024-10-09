@@ -176,6 +176,8 @@ MAILCHIMP_LOGFILE_NAME="$URL_NAME-output-$NOW.log"
 MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_LOGS_DIR/$MAILCHIMP_LOGFILE_NAME"
 MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED="$MAILCHIMP_LOGFILE_NAME.tar.gz"
 TEST_DATA="../test/test-data.html"
+AWS_S3_LOGFILE_KEY=$MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED
+AWS_S3_LOGHISTORY_KEY=$MAILCHIMP_EXECUTION_LOG_FILENAME
 
 if [[ ! -d $MAILCHIMP_LOGS_DIR ]]; then
     mkdir $MAILCHIMP_LOGS_DIR
@@ -231,6 +233,10 @@ if [[ ! -z $INCLUDE_CACHEBUSTER && $INCLUDE_CACHEBUSTER == "true" ]]; then
     EMAIL_CONTENT_URL="${EMAIL_CONTENT_URL}?cachebuster=$(useDate +%s)"
 fi
 
+if [[ -z $AWS_S3_LOGS_BUCKET ]]; then
+    logWarning "No AWS S3 bucket name privided! Logs will be saved locally only..."
+fi
+
 
 trap cleanUp EXIT
 
@@ -266,12 +272,51 @@ function cleanUp() {
     COMPLETE_TIME=$(useDate +%s)
     logInfo "Finished $FULL_NAME in $(($COMPLETE_TIME - $NOW_EPOCH)) seconds, at $(useDate -u +"%Y%m%dT%H:%M:%S%z")"
     
-    if [[ $DEBUG == "true" ]]; then
-        if ! code >/dev/null 2>&1; then
-            logDebug "Opening log file from this run (requires 'code' alias to open your editor of choice)..."
-            code $MAILCHIMP_SCRIPT_LOGFILE
+    # Upload logs to AWS S3
+    if [[ ! $DEBUG == "true" && ! -z $AWS_S3_LOGS_BUCKET ]]; then
+        logInfo "Processing logs to upload to AWS S3..."
+
+        # Test AWS login credentials are present and valid
+        logInfo "Testing AWS access..."
+        USER=$(aws sts get-caller-identity)
+        EXIT_CODE=$? testLogin 'aws-cli'
+        
+        logInfo "Switching to $MAILCHIMP_LOGS_DIR..."
+        cd $MAILCHIMP_LOGS_DIR
+
+        logInfo "Compressing the logs folder..."
+        tar -zcf $MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED $MAILCHIMP_LOGFILE_NAME
+        EXIT_CODE=$? receivedData "compress log folder"
+
+        if [[ -f "$MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED" ]]; then
+            if [[ -s "$MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED" ]]; then
+                
+                logInfo "Submitting compressed logs to AWS S3 bucket..."
+                aws s3 cp $MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGFILE_KEY"
+                EXIT_CODE=$? receivedData "upload logs to AWS S3"
+            else
+                logError "Compressed log file is empty, not uploading it to S3!"
+                exit 1
+            fi
+        else
+            logError "Failed to compress logs, quitting..."
         fi
+        
+        logInfo "Switching to $ROOT_DIR..."
+        cd $ROOT_DIR
+
+        if [[ -s "$MAILCHIMP_EXECUTION_LOG_FILENAME" ]]; then
+                logInfo "Submitting latest history log to AWS S3 bucket..."
+                aws s3 cp $MAILCHIMP_EXECUTION_LOG_FILENAME "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGHISTORY_KEY"
+                EXIT_CODE=$? receivedData "upload logs to AWS S3"
+        else 
+            logError "Log history file is empty, not uploading it to S3!"
+            exit 1
+        fi
+    else 
+        logInfo "DEBUG mode enabled, not uploading anything to S3!"
     fi
+
     return 0
 }
 

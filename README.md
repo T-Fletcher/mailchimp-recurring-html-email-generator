@@ -7,6 +7,7 @@ This script is for for Mailchimp users who want to:
 1. Manage their email content as a HTML webpage (such as via a CMS), and
 2. Ensure their email contains the latest content every time, and
 3. Send it to a specific Audience as a recurring email at a certain time.
+4. Saves logs to an AWS S3 bucket (optional)
 
 ## Contents
 - [Mailchimp recurring HTML email generator](#mailchimp-recurring-html-email-generator)
@@ -19,6 +20,8 @@ This script is for for Mailchimp users who want to:
   - [Gotchas](#gotchas)
     - [Date flags](#date-flags)
     - [Scheduling emails for times that land in the past](#scheduling-emails-for-times-that-land-in-the-past)
+  - [Logging](#logging)
+    - [Saving logs in an AWS S3 bucket](#saving-logs-in-an-aws-s3-bucket)
   - [Testing and debugging](#testing-and-debugging)
   - [Environment variables](#environment-variables)
 
@@ -47,7 +50,8 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 
 **Optional:**
 
- - [Pantheon's terminus](https://docs.pantheon.io/terminus)
+- [Pantheon's terminus](https://docs.pantheon.io/terminus)
+- aws-cli (optional, for S3 logging)
 
 
 ## Quick start
@@ -63,11 +67,11 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 ## How it works
 
 1. It fetches HTML data via a `curl` request to your desired webpage
-<!-- TODO: 2. It parses the HTML response and ensures it's valid -->
-3. It creates a Mailchimp email Template containing the HTML data via the Mailchimp API
-4. It creates a new Mailchimp Campaign using the new Template, and optionally saves it under an Campaign folder (if you've specified one)
-5. It schedules it to send to your nominated Mailchimp Audience at a time of your choosing (must be in 15 minute increments, see [Introduction](#introduction))
-6. It cleans up all script artifacts and deletes the new Template since they're single use
+2. It creates a Mailchimp email Template containing the HTML data via the Mailchimp API
+3. It creates a new Mailchimp Campaign using the new Template, and optionally saves it under an Campaign folder (if you've specified one)
+4. It schedules it to send to your nominated Mailchimp Audience at a time of your choosing (must be in 15 minute increments, see [Introduction](#introduction))
+5. It cleans up all script artifacts and deletes the new Template since they're single use
+6. Finally, it compresses the script log files and sends them to an AWS S3 bucket, should you include one in `.env`. *Note* this requires `aws-cli` installed and signed in on the script's local server
 
 
 ## When is this useful? 
@@ -101,10 +105,28 @@ Before attempting to schedule the email in Mailchimp, the script tests if the sc
 
 This is handles not knowing when a user may want to run the script, including when they are testing.
 
+## Logging
+
+Logs are always saved locally wherever the script runs. 
+
+The script generates a unique log file each time it runs, as well as appending the outcome of that run in a single 'script history' log file in the root directory. This lets you quickly tell if a run has succeeded/failed, and know which log file to check for the output.
+
+### Saving logs in an AWS S3 bucket
+
+Saving your logs in S3 requires `aws-cli` to be installed on the server the script is running on. The aws credentials used need to have access to whichever S3 bucket you specify for the upload to work. 
+
+You can optionally send your logs to S3 by providing your bucket name in the `AWS_S3_LOGS_BUCKET` variable in your `.env` file.
+
+The script will then attempt to log into your AWS account via `aws-cli`.
+If your AWS account has permissions to write to the S3 bucket, the log file will be copied there.
+
+If `DEBUG` is set to `true`, the script will not compress and submit the log files to AWS S3. 
+
 ## Testing and debugging
 
-To speed up testing, you can save a HTML sample in a file called `/test/test-data.html`. If `DEBUG` is enabled and the file exists, this data will be used instead of sending the `curl` request.
+To speed up testing, you can save a HTML sample in a file called `/test/test-data.html`. If `DEBUG` is set to `true` and the file exists, this data will be used instead of sending the `curl` request.
 
+> **Note** - If you are running this tool in the wild with S3 logging, and point to the same bucket when testing locally, you'll overwrite the history log file if `DEBUG` is not set to `true`! Ye be warned!
 
 ## Environment variables
 
@@ -114,7 +136,12 @@ All variables are required except those marked as 'optional'.
 DEBUG                                   - boolean - false
     Sends script output to the console 
     instead of the logs, outputs more 
-    verbose info
+    verbose info, disables submitting
+    logs to AWS S3
+
+AWS_S3_LOGS_BUCKET                      - string - optional
+    The name of the S3 bucket to send 
+    logs to
 
 EMAIL_CONTENT_URL                       - string
     URL to the webpage containing the
