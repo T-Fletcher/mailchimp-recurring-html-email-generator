@@ -18,11 +18,8 @@
 # Load env variables before doing anything else
 if [[ -f ".env" ]]; then
     source ".env"
-    if [[ $DEBUG == "true" ]]; then
-        echo -e "DEBUG mode is enabled"
-    fi
 else
-    logError "Environment variable file '.env' does not exist.
+    echo -e "Environment variable file '.env' does not exist.
     You can create one by copying '.env.example'." 1;
 fi
 
@@ -74,9 +71,10 @@ function logDebug() {
 function receivedData() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Failed to get $message" $EXIT_CODE
+        logError "Failed to $message" $EXIT_CODE
         return 1
     else 
+        logInfo "Success: $message"
         return 0
     fi
 }
@@ -167,7 +165,6 @@ function hasDatePassed() {
     fi
 }
 
-
 # Set up folder structure and logs names
 ROOT_DIR=$(pwd)
 FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
@@ -175,7 +172,9 @@ URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
 TEMP_DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
 MAILCHIMP_LOGS_DIR="$ROOT_DIR/$URL_NAME-logs"
 MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
-MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_LOGS_DIR/$URL_NAME-output-$NOW.log"
+MAILCHIMP_LOGFILE_NAME="$URL_NAME-output-$NOW.log"
+MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_LOGS_DIR/$MAILCHIMP_LOGFILE_NAME"
+MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED="$MAILCHIMP_LOGFILE_NAME.tar.gz"
 TEST_DATA="../test/test-data.html"
 
 if [[ ! -d $MAILCHIMP_LOGS_DIR ]]; then
@@ -183,11 +182,12 @@ if [[ ! -d $MAILCHIMP_LOGS_DIR ]]; then
 fi
 
 # Send script output to the logs
-echo -e "Saving output logs to $MAILCHIMP_SCRIPT_LOGFILE..."
+echo -e "Saving output logs to $MAILCHIMP_LOGFILE_NAME..."
 exec > $MAILCHIMP_SCRIPT_LOGFILE 2>&1
 
 # Prefix 'TEST--' to emails if debugging is enabled
 if [[ $DEBUG == "true" ]]; then
+    logDebug "DEBUG mode is enabled"
     MAILCHIMP_EMAIL_SHORT_NAME=$(echo "TEST--$MAILCHIMP_EMAIL_SHORT_NAME")
 fi
 
@@ -246,9 +246,9 @@ function cleanUp() {
     # Track the daily success/failure of the script, in a place that isn't
     # affected by the cleanup steps
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     else
-        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully.\n See $MAILCHIMP_SCRIPT_LOGFILE for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully. See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     fi
     
     rm -rf $TEMP_DIR;
@@ -325,7 +325,7 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     
     logInfo "Flushing Drupal caches..."
     terminus remote:drush $DRUPAL_TERMINUS_SITE -- cr
-    EXIT_CODE=$? receivedData 'Drupal cache flush'
+    EXIT_CODE=$? receivedData 'flush Drupal cache'
 
     # Pause before hitting Drupal for the new content, to avoid a race
     sleep 10
@@ -340,11 +340,11 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
     logWarning "Note if $TEST_DATA contains broken HTML, unexpected things may happen..."
     HTML=$(<$TEST_DATA)
-    EXIT_CODE=$? receivedData 'HTML test data'
+    EXIT_CODE=$? receivedData 'get HTML test data'
 else    
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     HTML=$(curl -sf "$EMAIL_CONTENT_URL")
-    EXIT_CODE=$? receivedData 'HTML data'
+    EXIT_CODE=$? receivedData 'get HTML data'
 fi
 
 logInfo "Data:\n$HTML"
@@ -361,7 +361,7 @@ logInfo "Encoding HTML data as a JSON-safe string"
 #! Do not use jq's -s option (--slurp) to grab the HTML as a single string!
 #! It adds a line break at the end of the string that breaks the JSON string.
 HTML_ENCODED=$(echo -e $HTML | jq -R ".")
-EXIT_CODE=$? receivedData 'HTML to JSON-safe string'
+EXIT_CODE=$? receivedData 'encode HTML to JSON-safe string'
 
 MAILCHIMP_CAMPAIGN_DATA='{
     "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATETIME"\"',
@@ -378,13 +378,13 @@ MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
   -d "${MAILCHIMP_CAMPAIGN_DATA}")
-EXIT_CODE=$? receivedData 'Template creation response'
+EXIT_CODE=$? receivedData 'get Template creation response'
 
 testMailchimpResponse "$MAILCHIMP_CREATE_TEMPLATE"
-EXIT_CODE=$? receivedData "Mailchimp template"
+EXIT_CODE=$? receivedData "get Mailchimp template"
 
 MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
-EXIT_CODE=$? receivedData "Template ID $MAILCHIMP_TEMPLATE_ID"
+EXIT_CODE=$? receivedData "get Template ID $MAILCHIMP_TEMPLATE_ID"
 
 logInfo "Creating new Email Campaign from the new Template..."
 
@@ -418,10 +418,10 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
     },
         "content_type": "template"
     }')
-EXIT_CODE=$? receivedData 'Email Campaign creation response'
+EXIT_CODE=$? receivedData 'get Email Campaign creation response'
 
 testMailchimpResponse "$MAILCHIMP_EMAIL"
-EXIT_CODE=$? receivedData "Mailchimp email"
+EXIT_CODE=$? receivedData "get Mailchimp email"
 
 logInfo "Email Campaign created successfully"
 
@@ -467,7 +467,7 @@ if [[ ! $DEBUG == "true" ]]; then
     "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
     --user "anystring:${MAILCHIMP_API_KEY}" \
     -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
-    EXIT_CODE=$? receivedData "Mailchimp email schedule"
+    EXIT_CODE=$? receivedData "set up Mailchimp email schedule"
 
     testMailchimpResponse $MAILCHIMP_EMAIL_SCHEDULE
 
