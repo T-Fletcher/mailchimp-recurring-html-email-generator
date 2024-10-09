@@ -41,7 +41,7 @@ function useDate() {
 }
 
 # NOTE: All times are in UTC unless the TIMEZONE env var is set
-NOW=$(useDate -u +"%Y%m%dT%H:%M:%S%z")
+NOW=$(useDate -u +"%Y%m%dT%H-%M-%S%z")
 NOW_EPOCH=$(useDate +"%s")
 TIME_OFFSET=$(useDate +"%z");
 
