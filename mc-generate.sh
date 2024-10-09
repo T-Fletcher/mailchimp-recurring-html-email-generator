@@ -331,8 +331,8 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     sleep 10
 fi
 
-DATE=$(useDate +"%d %h %Y")
-DATETIME=$(useDate +"%d %h %Y %H:%M:%S")
+DATE=$(useDate +"%-d %h %Y")
+DATETIME=$(useDate +"%-d %h %Y %H:%M:%S")
 
 logInfo "Using '$DATE' for the email subject line and '$DATETIME' for the email name."
 
