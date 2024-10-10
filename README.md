@@ -101,9 +101,40 @@ This is written to run in environments with access to GNU `date` or `gdate` (ava
 
 ### Scheduling emails for times that land in the past
 
+You can't schedule emails to send in the past. 
+
+To avoid confusion, ensure the ‘scheduled send’ time env variable uses the same timezone specified in `.env`.
+
 Before attempting to schedule the email in Mailchimp, the script tests if the scheduled email time is in the past. If it is, it assumes the schedule is intended for tomorrow and will add `+1 day` then test it again. 
 
 This is handles not knowing when a user may want to run the script, including when they are testing.
+
+You may still run into problems when using dates in timezones affected by Daylight Savings (DLS) e.g. `AEST`, and if running this script at a time close to midnight e.g. `10:00 AEST` = `00:00 UTC`. This is because of how the script handles date comparisons. For example:
+
+Running the script at 9:30am Darwin time means it runs right before midnight UTC. This means:
+
+1. the ‘current time’ is always ‘yesterday’ in relation to the send time, as it runs at 9:28am Darwin time (23:58 UTC on the previous day)
+2. the ‘scheduled time’ is therefore always considered to be in the past because it’s compared to the previous day in UTC
+3. the ‘scheduled time’ hours included in .env could be in any timezone you want e.g. `AEST`
+
+This in turn means:
+
+1. when the script tests the date initially, it fails as it’s in the past
+2. the script then adds +1 day to the scheduled time and checks it again
+3. If you’ve set a timezone affected by Daylight Savings in `TIMEZONE` and DLS is active, the timezone offset will change. e.g. if using 'Australia/Sydney', the offset changes from `+1000` to `+1100` hours.
+
+This means 10am is now considered to be *11* hours in the future from UTC, not 10.
+
+This then bumps the new ‘scheduled’ UTC time from `00:00` ‘today’ back to `23:00` yesterday. The date checker then fails again as the date has already passed, and no email will be scheduled.
+ 
+ > Note: If an email fails to schedule, it will still be saved as a Draft in Mailchimp.
+
+There are a few ways to fix this:
+
+1. Run your script at least 1 hour before after midnight to avoid DTS (may not be an option for your particular case)
+2. Remove the TIMEZONE in .env and set the scheduled send time in UTC.
+
+If running this script on a remote machine that automatically powers on/off e.g. AWS EC2 using AWS Systems Manager, pay close attention to ensure the machine will be powered on when you have configured the script to run! 
 
 ## Logging
 
@@ -133,34 +164,46 @@ To speed up testing, you can save a HTML sample in a file called `/test/test-dat
 All variables are required except those marked as 'optional'.
 
 ```
+AWS_S3_LOGS_BUCKET                      - string - optional
+    The name of the S3 bucket to send 
+    logs to
+
 DEBUG                                   - boolean - false
     Sends script output to the console 
     instead of the logs, outputs more 
     verbose info, disables submitting
     logs to AWS S3
 
-AWS_S3_LOGS_BUCKET                      - string - optional
-    The name of the S3 bucket to send 
-    logs to
+DELETE_TEMPLATE_ON_CLEANUP              - boolean - false
+    Delete the Mailchimp Template 
+    when the script finishes to save
+    clutter. Defaults to "false" for
+    easier debugging but should be 
+    "true" for production
+
+DRUPAL_TERMINUS_SITE                    - string - optional
+    Your Drupal website's Terminus
+    alias, if any
 
 EMAIL_CONTENT_URL                       - string
     URL to the webpage containing the
     data
 
-MAILCHIMP_EMAIL_SHORT_NAME              - string
-    Some distinctive name without 
-    spaces e.g. star-wars, used in 
-    file naming
-
-MAILCHIMP_SERVER_PREFIX                 - string
-    Mailchimp URL prefix
+INCLUDE_CACHEBUSTER                     - boolean - false - optional
+    Whether to include a timestamp
+    cachebuster in the URL to prevent
+    HMTL email content caching
 
 MAILCHIMP_API_KEY                       - string
     Your Mailchimp API key
 
-MAILCHIMP_TARGET_AUDIENCE_ID            - string
-    Your Mailchimp Audience ID, get
-    this via running mc-get-asset-ids.sh
+MAILCHIMP_EMAIL_DAILY_SEND_TIME         - string - optional
+    The time to send the email, in 
+    15 minute intervals 
+    e.g. 10:00:00, 02:45:00 etc.
+    Defaults to UTC if no TIMEZONE
+    is given. This time should be 
+    relative to the TIMEZONE
 
 MAILCHIMP_EMAIL_FOLDER_ID               - string - optional
     The ID of the Mailchimp Campaign 
@@ -172,18 +215,23 @@ MAILCHIMP_EMAIL_FROM                    - string
 MAILCHIMP_EMAIL_REPLYTO                 - string
     The email address to reply to
 
-MAILCHIMP_EMAIL_TITLE                   - string
-    The Campaign title in Mailchimp
+MAILCHIMP_EMAIL_SHORT_NAME              - string
+    Some distinctive name without 
+    spaces e.g. star-wars, used in 
+    file naming
 
 MAILCHIMP_EMAIL_SUBJECT                 - string
     The email subject line
 
-MAILCHIMP_EMAIL_DAILY_SEND_TIME         - string - optional
-    The time to send the email, in 
-    15 minute intervals 
-    e.g. 10:00:00, 02:45:00 etc.
-    Defaults to UTC if no TIMEZONE
-    is given
+MAILCHIMP_EMAIL_TITLE                   - string
+    The Campaign title in Mailchimp
+
+MAILCHIMP_SERVER_PREFIX                 - string
+    Mailchimp URL prefix
+
+MAILCHIMP_TARGET_AUDIENCE_ID            - string
+    Your Mailchimp Audience ID, get
+    this via running mc-get-asset-ids.sh
 
 TIMEZONE                                - string - optional
     The TZ code to use for the 
@@ -191,19 +239,4 @@ TIMEZONE                                - string - optional
     Defaults to UTC if no code is
     provided
 
-INCLUDE_CACHEBUSTER                     - boolean - false - optional
-    Whether to include a timestamp
-    cachebuster in the URL to prevent
-    HMTL email content caching
-
-DRUPAL_TERMINUS_SITE                    - string - optional
-    Your Drupal website's Terminus
-    alias, if any
-
-DELETE_TEMPLATE_ON_CLEANUP              - boolean - false
-    Delete the Mailchimp Template 
-    when the script finishes to save
-    clutter. Defaults to "false" for
-    easier debugging but should be 
-    "true" for production
 ```
