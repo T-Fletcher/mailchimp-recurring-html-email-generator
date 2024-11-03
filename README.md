@@ -63,6 +63,11 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 5. Add your chosen asset IDs to the `.env` file and populate the rest of the variables
 6. Run `$ bash mc-generate.sh` to generate and schedule your Mailchimp HTML Email Campaign.
 
+The email subject line will be the combination of `MAILCHIMP_EMAIL_SUBJECT: `, the current date in `d h Y` format, and ` MAILCHIMP_EMAIL_SUBJECT_SUFFIX` e.g.
+
+> "A catchy subject line sent at: 2 Nov 2024 and remember, you're awesome!"
+
+> "Our staff newsletter: 15 Feb 2025 - for internal use only"
 
 ## How it works
 
@@ -74,7 +79,7 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 6. Finally, it compresses the script log files and sends them to an AWS S3 bucket, should you include one in `.env`. *Note* this requires `aws-cli` installed and signed in on the script's local server
 
 
-## When is this useful? 
+## When is this useful?
 
 Doesn't Mailchimp already offer recurring HTML emails? HTML emails yes, recurring - sort of... this solution has arisen from many small blockers:
 
@@ -222,6 +227,11 @@ MAILCHIMP_EMAIL_SHORT_NAME              - string
 
 MAILCHIMP_EMAIL_SUBJECT                 - string
     The email subject line
+
+MAILCHIMP_EMAIL_SUBJECT_SUFFIX          - string - optional
+    The final part of the email 
+    subject line, useful for 
+    appending security labels etc
 
 MAILCHIMP_EMAIL_TITLE                   - string
     The Campaign title in Mailchimp

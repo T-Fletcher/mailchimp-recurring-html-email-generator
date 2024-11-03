@@ -445,7 +445,7 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
         "list_id": '\""$MAILCHIMP_TARGET_AUDIENCE_ID"\"'
     },
     "settings": {
-        "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE"\"',
+        "subject_line": '\""$MAILCHIMP_EMAIL_SUBJECT: $DATE $MAILCHIMP_EMAIL_SUBJECT_SUFFIX"\"',
         "preview_text": "",
         "title": '\""$MAILCHIMP_EMAIL_TITLE - $DATETIME"\"',
         "from_name": '\""$MAILCHIMP_EMAIL_FROM"\"',
