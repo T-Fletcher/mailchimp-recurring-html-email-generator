@@ -67,11 +67,11 @@ function logDebug() {
     fi
 }
 
-# Handle responses when requesting data 
-function receivedData() {
+# Handle responses when doing stuff
+function testResponse() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "Failed to $message" $EXIT_CODE
+        logError "FAIL: $message, exit code $EXIT_CODE"
         return 1
     else 
         logInfo "Success: $message"
@@ -286,14 +286,18 @@ function cleanUp() {
 
         logInfo "Compressing the logs folder..."
         tar -zcf $MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED $MAILCHIMP_LOGFILE_NAME
-        EXIT_CODE=$? receivedData "compress log folder"
+        EXIT_CODE=$? testResponse "Compress log folder"
 
         if [[ -f "$MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED" ]]; then
             if [[ -s "$MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED" ]]; then
                 
                 logInfo "Submitting compressed logs to AWS S3 bucket..."
                 aws s3 cp $MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGFILE_KEY"
-                EXIT_CODE=$? receivedData "upload logs to AWS S3"
+                EXIT_CODE=$? testResponse "Upload logs to AWS S3"
+                
+                logInfo "Removing original log file..."
+                rm -rf $MAILCHIMP_LOGFILE_NAME
+                EXIT_CODE=$? testResponse "Remove log file"
             else
                 logError "Compressed log file is empty, not uploading it to S3!"
                 exit 1
@@ -306,9 +310,9 @@ function cleanUp() {
         cd $ROOT_DIR
 
         if [[ -s "$MAILCHIMP_EXECUTION_LOG_FILENAME" ]]; then
-                logInfo "Submitting latest history log to AWS S3 bucket..."
-                aws s3 cp $MAILCHIMP_EXECUTION_LOG_FILENAME "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGHISTORY_KEY"
-                EXIT_CODE=$? receivedData "upload logs to AWS S3"
+            logInfo "Submitting latest history log to AWS S3 bucket..."
+            aws s3 cp $MAILCHIMP_EXECUTION_LOG_FILENAME "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGHISTORY_KEY"
+            EXIT_CODE=$? testResponse "Upload execution log file to AWS S3"
         else 
             logError "Log history file is empty, not uploading it to S3!"
             exit 1
@@ -370,7 +374,7 @@ if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     
     logInfo "Flushing Drupal caches..."
     terminus remote:drush $DRUPAL_TERMINUS_SITE -- cr
-    EXIT_CODE=$? receivedData 'flush Drupal cache'
+    EXIT_CODE=$? testResponse 'Flush Drupal cache'
 
     # Pause before hitting Drupal for the new content, to avoid a race
     sleep 10
@@ -385,11 +389,11 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     logDebug "Using data from '$TEST_DATA'..."
     logWarning "Note if $TEST_DATA contains broken HTML, unexpected things may happen..."
     HTML=$(<$TEST_DATA)
-    EXIT_CODE=$? receivedData 'get HTML test data'
+    EXIT_CODE=$? testResponse 'Get HTML test data'
 else    
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     HTML=$(curl -sf "$EMAIL_CONTENT_URL")
-    EXIT_CODE=$? receivedData 'get HTML data'
+    EXIT_CODE=$? testResponse 'Get HTML data'
 fi
 
 logInfo "Data:\n$HTML"
@@ -406,7 +410,7 @@ logInfo "Encoding HTML data as a JSON-safe string"
 #! Do not use jq's -s option (--slurp) to grab the HTML as a single string!
 #! It adds a line break at the end of the string that breaks the JSON string.
 HTML_ENCODED=$(echo -e $HTML | jq -R ".")
-EXIT_CODE=$? receivedData 'encode HTML to JSON-safe string'
+EXIT_CODE=$? testResponse 'Encode HTML to JSON-safe string'
 
 MAILCHIMP_CAMPAIGN_DATA='{
     "name": '\""$MAILCHIMP_EMAIL_SHORT_NAME template - $DATETIME"\"',
@@ -423,13 +427,13 @@ MAILCHIMP_CREATE_TEMPLATE=$(curl -sX POST \
   "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates" \
   --user "anystring:${MAILCHIMP_API_KEY}" \
   -d "${MAILCHIMP_CAMPAIGN_DATA}")
-EXIT_CODE=$? receivedData 'get Template creation response'
+EXIT_CODE=$? testResponse 'Get Template creation response'
 
 testMailchimpResponse "$MAILCHIMP_CREATE_TEMPLATE"
-EXIT_CODE=$? receivedData "get Mailchimp template"
+EXIT_CODE=$? testResponse "Get Mailchimp template"
 
 MAILCHIMP_TEMPLATE_ID=$(echo -e $MAILCHIMP_CREATE_TEMPLATE | jq -r ".id")
-EXIT_CODE=$? receivedData "get Template ID $MAILCHIMP_TEMPLATE_ID"
+EXIT_CODE=$? testResponse "Get Template ID $MAILCHIMP_TEMPLATE_ID"
 
 logInfo "Creating new Email Campaign from the new Template..."
 
@@ -463,10 +467,10 @@ MAILCHIMP_EMAIL=$(curl -sX POST \
     },
         "content_type": "template"
     }')
-EXIT_CODE=$? receivedData 'get Email Campaign creation response'
+EXIT_CODE=$? testResponse 'Get Email Campaign creation response'
 
 testMailchimpResponse "$MAILCHIMP_EMAIL"
-EXIT_CODE=$? receivedData "get Mailchimp email"
+EXIT_CODE=$? testResponse "Get Mailchimp email"
 
 logInfo "Email Campaign created successfully"
 
@@ -512,7 +516,7 @@ if [[ ! $DEBUG == "true" ]]; then
     "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/campaigns/$MAILCHIMP_EMAIL_ID/actions/schedule" \
     --user "anystring:${MAILCHIMP_API_KEY}" \
     -d '{"schedule_time": '\""$MAILCHIMP_SCHEDULED_TIME"\"'}')
-    EXIT_CODE=$? receivedData "set up Mailchimp email schedule"
+    EXIT_CODE=$? testResponse "Set up Mailchimp email schedule"
 
     testMailchimpResponse $MAILCHIMP_EMAIL_SCHEDULE
 
