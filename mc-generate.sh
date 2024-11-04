@@ -109,7 +109,6 @@ function testMailchimpResponse() {
         if [[ $responseStatus -lt 200 || $responseStatus -gt 299 ]]; then
             logWarning "Received HTTP response '$responseStatus' from Mailchimp! Quitting..."
             logError "$response"
-            return 1
         fi
         return 0
     else 
@@ -247,6 +246,11 @@ fi
 
 if [[ -z $AWS_S3_LOGS_BUCKET ]]; then
     logWarning "No AWS S3 bucket name privided! Logs will be saved locally only..."
+else 
+    # Test AWS login credentials are present and valid
+    logInfo "Testing AWS access..."
+    USER=$(aws sts get-caller-identity)
+    EXIT_CODE=$? testLogin 'aws-cli'
 fi
 
 
@@ -308,11 +312,6 @@ function cleanUp() {
     if [[ ! $DEBUG == "true" && ! -z $AWS_S3_LOGS_BUCKET ]]; then
         logInfo "Processing logs to upload to AWS S3..."
 
-        # Test AWS login credentials are present and valid
-        logInfo "Testing AWS access..."
-        USER=$(aws sts get-caller-identity)
-        EXIT_CODE=$? testLogin 'aws-cli'
-        
         logInfo "Switching to $MAILCHIMP_LOGS_DIR..."
         cd $MAILCHIMP_LOGS_DIR
 
@@ -331,11 +330,10 @@ function cleanUp() {
                 rm -rf $MAILCHIMP_LOGFILE_NAME
                 EXIT_CODE=$? testResponseAndWarn "Remove log file"
             else
-                logError "Compressed log file is empty, not uploading it to S3!"
-                exit 1
+                logWarning "Compressed log file is empty, not uploading it to S3!"
             fi
         else
-            logError "Failed to compress logs, quitting..."
+            logWarning "Failed to compress logs, not uploading anything to S3!"
         fi
         
         logInfo "Switching to $ROOT_DIR..."
@@ -346,8 +344,7 @@ function cleanUp() {
             aws s3 cp $MAILCHIMP_EXECUTION_LOG_FILENAME "s3://$AWS_S3_LOGS_BUCKET/$AWS_S3_LOGHISTORY_KEY"
             EXIT_CODE=$? testResponseAndWarn "Upload execution log file to AWS S3"
         else 
-            logError "Log history file is empty, not uploading it to S3!"
-            exit 1
+            logWarning "Log history file is empty, not uploading it to S3!"
         fi
     else 
         logInfo "DEBUG mode enabled, not uploading anything to S3!"
