@@ -49,7 +49,7 @@ TIME_OFFSET=$(useDate +"%z");
 function logError() {
     local message=$1
     local errorCode=$2
-    echo -e "[ERROR] - $message"
+    echo -e "[ERROR] - $message. Error code: $errorCode"
     exit $errorCode
 }
 
@@ -242,9 +242,10 @@ if [[ -z $AWS_S3_LOGS_BUCKET ]]; then
 fi
 
 
-trap cleanUp EXIT
+trap 'cleanUp $?' EXIT
 
 function cleanUp() {
+    local PASSED_EXIT_CODE=$1
     logInfo "Cleaning up script artifacts..."
     
     cd $ROOT_DIR
@@ -270,13 +271,13 @@ function cleanUp() {
         TAGS+=" [DEBUG]"
     fi
 
-    if [[ $EXIT_CODE -ne 0 ]]; then
+    if [[ $PASSED_EXIT_CODE -ne 0 ]]; then
         BUILD_STATUS="[FAILED]"
     else
         BUILD_STATUS="[SUCCESS]"
     fi
     
-    logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - $BUILD_STATUS - $TAGS $FULL_NAME failed to complete, exit code: $EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+    logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - $BUILD_STATUS - $TAGS $FULL_NAME, exit code: $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     
     rm -rf $TEMP_DIR;
     rm -rf "html.tmp"
@@ -287,6 +288,8 @@ function cleanUp() {
         "https://${MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/templates/$MAILCHIMP_TEMPLATE_ID" \
         --user "anystring:${MAILCHIMP_API_KEY}"
     fi
+
+    logInfo "Exit code: $PASSED_EXIT_CODE"
 
     logInfo "Clean up complete!"
     
