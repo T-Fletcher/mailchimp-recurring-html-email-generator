@@ -172,7 +172,11 @@ URL_NAME="mailchimp-$MAILCHIMP_EMAIL_SHORT_NAME-email-generator"
 TEMP_DIR="$ROOT_DIR/$URL_NAME-logs-$NOW"
 MAILCHIMP_LOGS_DIR="$ROOT_DIR/$URL_NAME-logs"
 MAILCHIMP_EXECUTION_LOG_FILENAME="$URL_NAME-history.log"
-MAILCHIMP_LOGFILE_NAME="$URL_NAME-output-$NOW.log"
+if [[ $DEBUG == "true" ]]; then
+    MAILCHIMP_LOGFILE_NAME="DEBUG-$URL_NAME-output-$NOW.log"
+else
+    MAILCHIMP_LOGFILE_NAME="$URL_NAME-output-$NOW.log"
+fi
 MAILCHIMP_SCRIPT_LOGFILE="$MAILCHIMP_LOGS_DIR/$MAILCHIMP_LOGFILE_NAME"
 MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED="$MAILCHIMP_LOGFILE_NAME.tar.gz"
 TEST_DATA="../test/test-data.html"
@@ -251,11 +255,28 @@ function cleanUp() {
     
     # Track the daily success/failure of the script, in a place that isn't
     # affected by the cleanup steps
-    if [[ $EXIT_CODE -ne 0 ]]; then
-        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [FAIL] - $FULL_NAME failed to complete, exit code: $EXIT_CODE.\n See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
-    else
-        logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - [SUCCESS] - $FULL_NAME completed successfully. See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
+    
+    # Capture build tags to make navigating the logs easier
+    TAGS=""
+    BUILD_STATUS=""
+
+    if [[ $CRON == 'true' ]]; then
+        TAGS+="[CRON]"
+    else 
+        TAGS+="[MANUAL]"
     fi
+    
+    if [[ $DEBUG == "true" ]]; then
+        TAGS+=" [DEBUG]"
+    fi
+
+    if [[ $EXIT_CODE -ne 0 ]]; then
+        BUILD_STATUS="[FAILED]"
+    else
+        BUILD_STATUS="[SUCCESS]"
+    fi
+    
+    logInfo "$(useDate -u +"%Y%m%dT%H:%M:%S%z") - $BUILD_STATUS - $TAGS $FULL_NAME failed to complete, exit code: $EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details." >> $MAILCHIMP_EXECUTION_LOG_FILENAME
     
     rm -rf $TEMP_DIR;
     rm -rf "html.tmp"
