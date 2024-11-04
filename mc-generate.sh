@@ -197,7 +197,7 @@ if [[ $DEBUG == "true" ]]; then
     MAILCHIMP_EMAIL_SHORT_NAME=$(echo "TEST--$MAILCHIMP_EMAIL_SHORT_NAME")
 fi
 
-logInfo "$FULL_NAME starting..."
+logInfo "$FULL_NAME starting at $NOW..."
 
 if [[ -z $MAILCHIMP_SERVER_PREFIX || -z $MAILCHIMP_API_KEY || -z $EMAIL_CONTENT_URL || -z $MAILCHIMP_EMAIL_SHORT_NAME ]]; then
     logError "Required environment variables are missing.

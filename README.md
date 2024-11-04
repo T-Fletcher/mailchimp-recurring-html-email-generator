@@ -41,7 +41,7 @@ CRON='true'
 ```
 
 
-> The scheduled time the email is sent will be applied to whatever day the script is run, and only if it's in the future - running this script at 10am to schedule a 9am email won't work.
+> The scheduled time the email is sent will be applied to whatever day the script is run. If the scheduled time has already passed e.g. 10am to send a 9am email, the email is scheduled for 1 day in the future.
 
 This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/marketing/api/) as of 9 August 2024.
 
@@ -59,7 +59,7 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 **Optional:**
 
 - [Pantheon's terminus](https://docs.pantheon.io/terminus)
-- aws-cli (optional, for S3 logging)
+- aws-cli (optional, for S3 logging. Assumes you are logged into `aws-cli` as a user with `write` permissions to this bucket)
 
 
 ## Quick start
@@ -199,7 +199,9 @@ All variables are required except those marked as 'optional'.
 ```
 AWS_S3_LOGS_BUCKET                      - string - optional
     The name of the S3 bucket to send 
-    logs to
+    logs to. Assumes you are logged into
+    aws-cli as a user with write access
+    to this bucket
 
 DEBUG                                   - boolean - false
     Sends script output to the console 
