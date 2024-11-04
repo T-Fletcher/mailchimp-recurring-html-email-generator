@@ -134,8 +134,8 @@ function tidyErrors() {
     fi
 }
 
-function isDateValidISO8601() {    
-    useDate "+%Y-%m-%dT%H:%M:%S%z" -d $1
+function isDateValidISO8601() {
+    useDate "+%Y-%m-%dT%H:%M:%S%z" -d $1 > /dev/null
     EXIT_CODE=$? 
 
     if [[ $EXIT_CODE -ne 0 ]]; then
