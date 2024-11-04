@@ -13,3 +13,4 @@ mailchimp-data-*-ids.txt
 
 # Script logs
 mailchimp-*.log
+mailchimp-*-email-generator-logs/
