@@ -33,6 +33,14 @@ If you're using Pantheon Drupal, it integrates with Terminus to clear the cache 
 
 To make the email recurring e.g. hourly, daily, weekly etc, you can schedule the script to run periodically via a daily `cron` task. Note that the send time (`MAILCHIMP_EMAIL_DAILY_SEND_TIME`) must be one of 15 minute intervals for Mailchimp to schedule it i.e. `00:00`, `00:15`, `00:30`, `00:45` etc.
 
+Be sure to prefix your cron task with a `CRON='true'` environment variable to ensure the script captures when it's being run via cron, e.g. 
+
+```bash
+CRON='true'
+28 00 * * * cd /path/to/mailchimp-recurring-html-email-generator; bash mc-generate.sh
+```
+
+
 > The scheduled time the email is sent will be applied to whatever day the script is run, and only if it's in the future - running this script at 10am to schedule a 9am email won't work.
 
 This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/marketing/api/) as of 9 August 2024.
@@ -62,6 +70,22 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
 4. In your terminal, run `$ bash mc-get-asset-ids.sh` to get the Mailchimp Asset IDs for your Mailchimp Audience and Campaign folder
 5. Add your chosen asset IDs to the `.env` file and populate the rest of the variables
 6. Run `$ bash mc-generate.sh` to generate and schedule your Mailchimp HTML Email Campaign.
+
+**For scheduling periodic emails, use a cron job:**
+
+7. Open your crontab: `$ crontab -e`
+8. Add the location of your installed tooling in a `PATH` variable, so the cron task can access them (example from an AWS EC2 instance):
+    ```
+    PATH=/home/ec2-user/.local/bin:/home/ec2-user/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/home/ec2-user/.composer/vendor/bin:/home/ec2-user/terminus/terminus
+    ```
+9. Add a variable called `CRON='true'` (this is used to determine if the script is being run via cron or manually):
+    ```
+    CRON='true'
+    ```
+10. On the next line, add a cron job to run the script at the desired interval, e.g. daily at 10am UTC:
+    ```
+    0 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; bash mc-generate.sh
+    ```
 
 The email subject line will be the combination of `MAILCHIMP_EMAIL_SUBJECT: `, the current date in `d h Y` format, and ` MAILCHIMP_EMAIL_SUBJECT_SUFFIX` e.g.
 
@@ -143,11 +167,15 @@ If running this script on a remote machine that automatically powers on/off e.g.
 
 ## Logging
 
-Logs are always saved locally wherever the script runs. 
+Logs are always saved locally wherever the script runs. You can include AWS S3 bucket credentials in the `.env` file to save logs to an S3 bucket (strongly recommended - log it all, and log it elsewhere).
 
 The script generates a unique log file each time it runs, as well as appending the outcome of that run in a single 'script history' log file in the root directory. This lets you quickly tell if a run has succeeded/failed, and know which log file to check for the output.
 
+Log files from runs with DEBUG enabled are prefixed with `DEBUG-`, and the activity log will show `[DEBUG]` + `[CRON/MANUAL]` to indicate if the script was run manually or via cron. This is useful for picking which runs were the result of testing. 
+
 ### Saving logs in an AWS S3 bucket
+
+> *Thou shalt save thy logs in a separate environment* - Gandalf
 
 Saving your logs in S3 requires `aws-cli` to be installed on the server the script is running on. The aws credentials used need to have access to whichever S3 bucket you specify for the upload to work. 
 
