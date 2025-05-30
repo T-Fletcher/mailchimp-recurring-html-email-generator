@@ -173,14 +173,15 @@ function hasDatePassed() {
 }
 
 function sendAlertEmail() {
-    local message=$@
+    local SUBJECT=$1
+    local MESSAGE=$2
     if [[ -z $AWS_SNS_TOPIC_ARN || -z $AWS_REGION || -z $AWS_USER ]]; then
         logWarning "No AWS credentials provided, cannot send alert email via AWS SNS without these!"
         return 0
     fi
 
     logInfo "Sending alert email via AWS SNS..."
-    aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --message "$message" --profile=$AWS_USER --region $AWS_REGION
+    aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --subject "$SUBJECT" --message "$MESSAGE" --profile=$AWS_USER --region $AWS_REGION
     EXIT_CODE=$? testResponseAndWarn "Send alert email via AWS SNS"
 }
 
@@ -304,7 +305,7 @@ function cleanUp() {
 
     if [[ $PASSED_EXIT_CODE -ne 0 ]]; then
         logWarning "Script failed, attempting to send AWS SNS notification email..."
-        sendAlertEmail "Mailchimp Email Generator '$MAILCHIMP_EMAIL_SHORT_NAME' failed with exit code $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details."
+        sendAlertEmail "ALERT: $MAILCHIMP_EMAIL_TITLE failed to send via the Mailchimp Email Generator!" "Mailchimp Email Generator '$MAILCHIMP_EMAIL_SHORT_NAME' failed with exit code $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details."
         BUILD_STATUS="[FAILED]"
     else
         BUILD_STATUS="[SUCCESS]"
