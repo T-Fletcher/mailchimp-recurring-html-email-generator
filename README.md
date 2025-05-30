@@ -21,6 +21,7 @@ This script is for for Mailchimp users who want to:
     - [Date flags](#date-flags)
     - [Scheduling emails for times that land in the past](#scheduling-emails-for-times-that-land-in-the-past)
   - [Logging](#logging)
+    - [Failure notifications](#failure-notifications)
     - [Saving logs in an AWS S3 bucket](#saving-logs-in-an-aws-s3-bucket)
   - [Testing and debugging](#testing-and-debugging)
   - [Environment variables](#environment-variables)
@@ -173,6 +174,10 @@ The script generates a unique log file each time it runs, as well as appending t
 
 Log files from runs with DEBUG enabled are prefixed with `DEBUG-`, and the activity log will show `[DEBUG]` + `[CRON/MANUAL]` to indicate if the script was run manually or via cron. This is useful for picking which runs were the result of testing. 
 
+### Failure notifications
+
+Regular emails are easy to miss if one doesn't arrive on day. If you have set up an AWS SNS topic (and subscribe to it), add in the details as environment variables in the `.env` file, the script will attempt to send failure notifications to that Topic. Note the `AWS_USER` must have permissions to publish messages to the SNS topic.
+
 ### Saving logs in an AWS S3 bucket
 
 > *Thou shalt save thy logs in a separate environment* - Gandalf
@@ -202,6 +207,18 @@ AWS_S3_LOGS_BUCKET                      - string - optional
     logs to. Assumes you are logged into
     aws-cli as a user with write access
     to this bucket
+
+AWS_REGION                              - string - optional
+    The AWS region to use for the 
+    SNS topics e.g. ap-southeast-2
+
+AWS_SNS_TOPIC_ARN                       - string - optional
+    The ARN of the AWS SNS topic to send
+    failure alert emails
+
+AWS_USER                                - string - optional
+    The AWS user with access to send 
+    messages to SNS topics
 
 DEBUG                                   - boolean - false
     Sends script output to the console 

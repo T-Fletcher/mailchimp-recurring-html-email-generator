@@ -71,7 +71,7 @@ function logDebug() {
 function testResponseAndWarn() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "FAIL: $message, exit code $EXIT_CODE"
+        logWarning "FAIL: $message, exit code $EXIT_CODE"
     else 
         logInfo "Success: $message"
         return 0
@@ -172,6 +172,18 @@ function hasDatePassed() {
     fi
 }
 
+function sendAlertEmail() {
+    local message=$@
+    if [[ -z $AWS_SNS_TOPIC_ARN || -z $AWS_REGION || -z $AWS_USER ]]; then
+        logWarning "No AWS credentials provided, cannot send alert email via AWS SNS without these!"
+        return 0
+    fi
+
+    logInfo "Sending alert email via AWS SNS..."
+    aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --message "$message" --profile=$AWS_USER --region $AWS_REGION
+    EXIT_CODE=$? testResponseAndWarn "Send alert email via AWS SNS"
+}
+
 # Set up folder structure and logs names
 ROOT_DIR=$(pwd)
 FULL_NAME="Mailchimp $MAILCHIMP_EMAIL_SHORT_NAME Email Generator"
@@ -227,6 +239,7 @@ if [[ -z $MAILCHIMP_TARGET_AUDIENCE_ID ]]; then
     The Template will still be generated but no emails will be created or sent."
 fi
 
+
 if [[ -z $DRUPAL_TERMINUS_SITE ]]; then
     logWarning "Terminus site environment variable is not set!
     Let's assume your URL isn't from a Pantheon Drupal website."
@@ -242,6 +255,12 @@ fi
 if [[ ! -z $INCLUDE_CACHEBUSTER && $INCLUDE_CACHEBUSTER == "true" ]]; then
     logInfo "Adding a cachebuster suffix to the initial HTML data curl request"
     EMAIL_CONTENT_URL="${EMAIL_CONTENT_URL}?cachebuster=$(useDate +%s)"
+fi
+
+if [[ -z $AWS_SNS_TOPIC_ARN ]]; then
+    logWarning "AWS SNS topic ARN environment variable is missing! 
+    If you're running this script periodically, it's strongly recommended 
+    to have an alert email in place for if it fails for any reason!"
 fi
 
 if [[ -z $AWS_S3_LOGS_BUCKET ]]; then
@@ -284,6 +303,8 @@ function cleanUp() {
     fi
 
     if [[ $PASSED_EXIT_CODE -ne 0 ]]; then
+        logWarning "Script failed, attempting to send AWS SNS notification email..."
+        sendAlertEmail "Mailchimp Email Generator '$MAILCHIMP_EMAIL_SHORT_NAME' failed with exit code $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details."
         BUILD_STATUS="[FAILED]"
     else
         BUILD_STATUS="[SUCCESS]"
