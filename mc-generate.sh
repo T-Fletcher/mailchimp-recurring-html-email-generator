@@ -108,6 +108,7 @@ function testMailchimpResponse() {
     elif [[ $responseStatus =~ ^[0-9]+$ ]]; then
         if [[ $responseStatus -lt 200 || $responseStatus -gt 299 ]]; then
             logWarning "Received HTTP response '$responseStatus' from Mailchimp! Quitting..."
+            deleteEmail $MAILCHIMP_EMAIL_ID
             logError "$response" $responseStatus
         fi
         return 0
