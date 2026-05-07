@@ -15,6 +15,7 @@ This script is for for Mailchimp users who want to:
   - [Introduction](#introduction)
   - [Requirements](#requirements)
   - [Quick start](#quick-start)
+    - [Running multiple campaigns from one .env](#running-multiple-campaigns-from-one-env)
   - [How it works](#how-it-works)
   - [When is this useful?](#when-is-this-useful)
   - [Gotchas](#gotchas)
@@ -87,6 +88,33 @@ This script uses [v3.0 of the Mailchimp API](https://mailchimp.com/developer/mar
     ```
     0 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; bash mc-generate.sh
     ```
+
+### Running multiple campaigns from one .env
+
+You can keep settings for multiple email campaigns in a single `.env` by prefixing
+variable names and selecting a project at runtime.
+
+Example `.env` entries:
+
+```bash
+PROJ1_MAILCHIMP_TARGET_AUDIENCE_ID="audience-id-1"
+PROJ1_MAILCHIMP_EMAIL_FOLDER_ID="folder-id-1"
+PROJ1_EMAIL_CONTENT_URL="https://example.com/email-1"
+
+PROJ2_MAILCHIMP_TARGET_AUDIENCE_ID="audience-id-2"
+PROJ2_MAILCHIMP_EMAIL_FOLDER_ID="folder-id-2"
+PROJ2_EMAIL_CONTENT_URL="https://example.com/email-2"
+```
+
+Run from cron by setting `PROJECT` per line:
+
+```bash
+0 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ1 CRON=true bash mc-generate.sh
+2 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ2 CRON=true bash mc-generate.sh
+```
+
+The script resolves `PROJECT_<VAR_NAME>` first, then falls back to the
+unprefixed variable if present.
 
 The email subject line will be the combination of `MAILCHIMP_EMAIL_SUBJECT: `, the current date in `d h Y` format, and ` MAILCHIMP_EMAIL_SUBJECT_SUFFIX` e.g.
 

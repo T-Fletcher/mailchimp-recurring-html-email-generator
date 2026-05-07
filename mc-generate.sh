@@ -22,6 +22,49 @@ else
     You can create one by copying '.env.example'." 1;
 fi
 
+# Optional multi-project mode: Run with inline variable 'PROJECT=PROJ1' to load
+# 'PROJ1_<VAR_NAME>' values from .env. Unprefixed values remain supported and
+# are used as fallbacks.
+if [[ -n $PROJECT ]]; then
+    function resolveProjectEnvVar() {
+        local baseKey=$1
+        local scopedKey="${PROJECT}_${baseKey}"
+
+        if [[ -n ${!scopedKey+x} && -n ${!scopedKey} ]]; then
+            printf -v "$baseKey" '%s' "${!scopedKey}"
+            export "$baseKey"
+        fi
+    }
+
+    PROJECT_SCOPED_KEYS=(
+        DEBUG
+        EMAIL_CONTENT_URL
+        TIMEZONE
+        MAILCHIMP_EMAIL_DAILY_SEND_TIME
+        MAILCHIMP_EMAIL_SHORT_NAME
+        MAILCHIMP_SERVER_PREFIX
+        MAILCHIMP_API_KEY
+        MAILCHIMP_TARGET_AUDIENCE_ID
+        MAILCHIMP_EMAIL_FOLDER_ID
+        MAILCHIMP_EMAIL_FROM
+        MAILCHIMP_EMAIL_REPLYTO
+        MAILCHIMP_EMAIL_TITLE
+        MAILCHIMP_EMAIL_SUBJECT
+        MAILCHIMP_EMAIL_SUBJECT_SUFFIX
+        INCLUDE_CACHEBUSTER
+        DRUPAL_TERMINUS_SITE
+        DELETE_TEMPLATE_ON_CLEANUP
+        AWS_REGION
+        AWS_S3_LOGS_BUCKET
+        AWS_SNS_TOPIC_ARN
+        AWS_USER
+    )
+
+    for key in "${PROJECT_SCOPED_KEYS[@]}"; do
+        resolveProjectEnvVar "$key"
+    done
+fi
+
 # Better logging
 function logError() {
     local message=$1
