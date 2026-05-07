@@ -5,6 +5,28 @@ echo -e "[NOTE] - This will collect the first 1000 items of each due to Mailchim
 
 echo -e "[NOTE] - You must add your Mailchimp API key and Server Prefix to '.env' for this to work."
 
+# Better logging
+function logError() {
+    local message=$1
+    local errorCode=$2
+    echo -e "[ERROR] - $message. Error code: $errorCode"
+    exit $errorCode
+}
+
+function logInfo() {
+    echo -e "[INFO] - $@"
+}
+
+function logWarning() {
+    echo -e "[WARNING] - $@"
+}
+
+function logDebug() {
+    if [[ $DEBUG == "true" ]]; then
+        echo -e "[DEBUG] - $@"
+    fi
+}
+
 # Load env variables before doing anything else
 if [[ -f ".env" ]]; then
     source ".env"
