@@ -65,28 +65,6 @@ if [[ -n $PROJECT ]]; then
     done
 fi
 
-# Better logging
-function logError() {
-    local message=$1
-    local errorCode=$2
-    echo -e "[ERROR] - $message. Error code: $errorCode"
-    exit $errorCode
-}
-
-function logInfo() {
-    echo -e "[INFO] - $@"
-}
-
-function logWarning() {
-    echo -e "[WARNING] - $@"
-}
-
-function logDebug() {
-    if [[ $DEBUG == "true" ]]; then
-        echo -e "[DEBUG] - $@"
-    fi
-}
-
 function useDate() {
     if date --version >/dev/null 2>&1 ; then
         # OS uses GNU date
