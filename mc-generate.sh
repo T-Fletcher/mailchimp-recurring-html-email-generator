@@ -59,27 +59,27 @@ if [[ -n $PROJECT ]]; then
     }
 
     PROJECT_SCOPED_KEYS=(
-        DEBUG
-        EMAIL_CONTENT_URL
-        TIMEZONE
-        MAILCHIMP_EMAIL_DAILY_SEND_TIME
-        MAILCHIMP_EMAIL_SHORT_NAME
-        MAILCHIMP_SERVER_PREFIX
-        MAILCHIMP_API_KEY
-        MAILCHIMP_TARGET_AUDIENCE_ID
-        MAILCHIMP_EMAIL_FOLDER_ID
-        MAILCHIMP_EMAIL_FROM
-        MAILCHIMP_EMAIL_REPLYTO
-        MAILCHIMP_EMAIL_TITLE
-        MAILCHIMP_EMAIL_SUBJECT
-        MAILCHIMP_EMAIL_SUBJECT_SUFFIX
-        INCLUDE_CACHEBUSTER
-        DRUPAL_TERMINUS_SITE
-        DELETE_TEMPLATE_ON_CLEANUP
         AWS_REGION
         AWS_S3_LOGS_BUCKET
         AWS_SNS_TOPIC_ARN
         AWS_USER
+        DEBUG
+        DELETE_TEMPLATE_ON_CLEANUP
+        DRUPAL_TERMINUS_SITE
+        EMAIL_CONTENT_URL
+        INCLUDE_CACHEBUSTER
+        MAILCHIMP_API_KEY
+        MAILCHIMP_EMAIL_DAILY_SEND_TIME
+        MAILCHIMP_EMAIL_FOLDER_ID
+        MAILCHIMP_EMAIL_FROM
+        MAILCHIMP_EMAIL_REPLYTO
+        MAILCHIMP_EMAIL_SHORT_NAME
+        MAILCHIMP_EMAIL_SUBJECT
+        MAILCHIMP_EMAIL_SUBJECT_SUFFIX
+        MAILCHIMP_EMAIL_TITLE
+        MAILCHIMP_SERVER_PREFIX
+        MAILCHIMP_TARGET_AUDIENCE_ID
+        TIMEZONE
     )
 
     for key in "${PROJECT_SCOPED_KEYS[@]}"; do
@@ -224,7 +224,13 @@ function sendAlertEmail() {
     fi
 
     logInfo "Sending alert email via AWS SNS..."
-    aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --subject "$SUBJECT" --message "$MESSAGE" --profile=$AWS_USER --region $AWS_REGION
+    # aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --subject "$SUBJECT" --message "$MESSAGE" --profile=$AWS_USER --region $AWS_REGION
+    aws sns publish \
+        --topic-arn $AWS_SNS_TOPIC_ARN \
+        --subject "TEST SUBJECT" \
+        --message "$MESSAGE" \
+        --profile=$AWS_USER \
+        --region $AWS_REGION
     EXIT_CODE=$? testResponseAndWarn "Send alert email via AWS SNS"
 }
 
