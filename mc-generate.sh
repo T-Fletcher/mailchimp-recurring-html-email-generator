@@ -102,7 +102,7 @@ function testResponseAndWarn() {
 function testResponseAndQuit() {
     local message=$1
     if [[ $EXIT_CODE -ne 0 ]]; then
-        logError "FAIL: $message, exit code $EXIT_CODE"
+        logError "FAIL: $message" $EXIT_CODE
     else 
         logInfo "Success: $message"
         return 0
