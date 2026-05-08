@@ -268,7 +268,12 @@ DRUPAL_TERMINUS_SITE                    - string - optional
 EMAIL_CONTENT_URL                       - string
     URL to the webpage containing the
     data
-
+    
+EMAIL_SOURCE_API_KEY                   - string - optional
+    The API key to use in the header of
+    the curl request to fetch the HTML
+    data, if required by the source
+    
 INCLUDE_CACHEBUSTER                     - boolean - false - optional
     Whether to include a timestamp
     cachebuster in the URL to prevent

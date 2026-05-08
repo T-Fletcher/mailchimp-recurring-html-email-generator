@@ -492,8 +492,12 @@ if [[ $DEBUG == "true" && -f $TEST_DATA ]]; then
     EXIT_CODE=$? testResponseAndQuit 'Get HTML test data'
 else    
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
-    # TODO: Add authentication options
-    HTML=$(curl -H "X-API-KEY: $1234" -sf "$EMAIL_CONTENT_URL")
+    if [[ -n $EMAIL_SOURCE_API_KEY ]]; then
+        logInfo "API KEY variable found, using API key in request header to source HTML data..."
+        HTML=$(curl -H "API-KEY: $EMAIL_SOURCE_API_KEY" -sf "$EMAIL_CONTENT_URL")
+    else
+        HTML=$(curl -sf "$EMAIL_CONTENT_URL")
+    fi
     EXIT_CODE=$? testResponseAndQuit 'Get HTML data'
 fi
 
