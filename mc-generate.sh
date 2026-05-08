@@ -11,15 +11,37 @@
 
 # @TODO:
 #
-# 1. Validate incoming HTML via Tidy
+# 1. Add support for designating target segments and tags within audiences
 # 2. Expand scheduling options to include weekly, fortnightly and monthly
+# 3. Validate incoming HTML via Tidy
+
+# Better logging
+function logError() {
+    local message=$1
+    local errorCode=$2
+    echo -e "[ERROR] - $message. Error code: $errorCode"
+    exit $errorCode
+}
+
+function logInfo() {
+    echo -e "[INFO] - $@"
+}
+
+function logWarning() {
+    echo -e "[WARNING] - $@"
+}
+
+function logDebug() {
+    if [[ $DEBUG == "true" ]]; then
+        echo -e "[DEBUG] - $@"
+    fi
+}
 
 # Load env variables before doing anything else
 if [[ -f ".env" ]]; then
     source ".env"
 else
-    echo -e "Environment variable file '.env' does not exist.
-    You can create one by copying '.env.example'." 1;
+    logError "Environment variable file '.env' does not exist. You can create one by copying '.env.example'." 1;
 fi
 
 # Better logging
@@ -65,28 +87,6 @@ function useDate() {
 NOW=$(useDate -u +"%Y%m%dT%H-%M-%S%z")
 NOW_EPOCH=$(useDate +"%s")
 TIME_OFFSET=$(useDate +"%z");
-
-# Better logging
-function logError() {
-    local message=$1
-    local errorCode=$2
-    echo -e "[ERROR] - $message. Error code: $errorCode"
-    exit $errorCode
-}
-
-function logInfo() {
-    echo -e "[INFO] - $@"
-}
-
-function logWarning() {
-    echo -e "[WARNING] - $@"
-}
-
-function logDebug() {
-    if [[ $DEBUG == "true" ]]; then
-        echo -e "[DEBUG] - $@"
-    fi
-}
 
 # Handle responses when doing stuff
 function testResponseAndWarn() {
