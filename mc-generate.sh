@@ -464,8 +464,7 @@ MAILCHIMP_API_KEY=$MAILCHIMP_API_KEY
 if [[ ! -z $DRUPAL_TERMINUS_SITE ]]; then
     logInfo "Terminus sitename provided: $DRUPAL_TERMINUS_SITE"
     logInfo "Attempting to log into Terminus via machine token to prevent session timeouts..."
-    
-    terminus auth:login
+    terminus auth:login --email=$DRUPAL_TERMINUS_EMAIL
     EXIT_CODE=$? testLogin 'Terminus'
     
     logInfo "Testing Drush access..."

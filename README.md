@@ -261,6 +261,14 @@ DELETE_TEMPLATE_ON_CLEANUP              - boolean - false
     easier debugging but should be 
     "true" for production
 
+DRUPAL_TERMINUS_EMAIL                   - string - optional
+    The email associated with your 
+    Pantheon account, used for logging
+    into Terminus to prevent session
+    timeouts when clearing cache. Only
+    required if using the 
+    DRUPAL_TERMINUS_SITE variable
+
 DRUPAL_TERMINUS_SITE                    - string - optional
     Your Drupal website's Terminus
     alias, if any
