@@ -494,7 +494,7 @@ else
     logInfo "Sourcing data from '$EMAIL_CONTENT_URL'"
     if [[ -n $EMAIL_SOURCE_API_KEY ]]; then
         logInfo "API KEY variable found, using API key in request header to source HTML data..."
-        HTML=$(curl -H "API-KEY: $EMAIL_SOURCE_API_KEY" -sf "$EMAIL_CONTENT_URL")
+        HTML=$(curl -H "api-key: $EMAIL_SOURCE_API_KEY" -sf "$EMAIL_CONTENT_URL")
     else
         HTML=$(curl -sf "$EMAIL_CONTENT_URL")
     fi
