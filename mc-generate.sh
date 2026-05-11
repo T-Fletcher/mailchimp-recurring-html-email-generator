@@ -228,7 +228,7 @@ function sendAlertEmail() {
     # aws sns publish --topic-arn $AWS_SNS_TOPIC_ARN --subject "$SUBJECT" --message "$MESSAGE" --profile=$AWS_USER --region $AWS_REGION
     aws sns publish \
         --topic-arn $AWS_SNS_TOPIC_ARN \
-        --subject "TEST SUBJECT" \
+        --subject "$SUBJECT" \
         --message "$MESSAGE" \
         --profile=$AWS_USER \
         --region $AWS_REGION
