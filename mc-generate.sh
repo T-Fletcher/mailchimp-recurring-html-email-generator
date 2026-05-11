@@ -386,7 +386,7 @@ function cleanUp() {
         logInfo "Switching to $MAILCHIMP_LOGS_DIR..."
         cd $MAILCHIMP_LOGS_DIR
 
-        logInfo "Compressing the logs folder..."
+        logInfo "Compressing the logs folder (nothing will appear after this line)..."
         tar -zcf $MAILCHIMP_SCRIPT_LOGFILE_COMPRESSED $MAILCHIMP_LOGFILE_NAME
         EXIT_CODE=$? testResponseAndWarn "Compress log folder"
 
