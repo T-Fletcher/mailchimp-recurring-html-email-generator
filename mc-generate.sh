@@ -354,7 +354,7 @@ function cleanUp() {
 
     if [[ $PASSED_EXIT_CODE -ne 0 ]]; then
         logWarning "Script failed, attempting to send AWS SNS notification email..."
-        sendAlertEmail "ALERT: $MAILCHIMP_EMAIL_TITLE failed to send via the Mailchimp Email Generator!" "Mailchimp Email Generator '$MAILCHIMP_EMAIL_SHORT_NAME' failed with exit code $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details."
+        sendAlertEmail "ALERT: $MAILCHIMP_EMAIL_TITLE failed to schedule a Mailchimp email campaign!" "Mailchimp Email Generator '$MAILCHIMP_EMAIL_SHORT_NAME' failed with exit code $PASSED_EXIT_CODE. See $MAILCHIMP_LOGFILE_NAME for more details."
         BUILD_STATUS="[FAILED]"
     else
         BUILD_STATUS="[SUCCESS]"
