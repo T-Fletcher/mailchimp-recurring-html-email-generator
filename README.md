@@ -20,6 +20,7 @@ This script is for for Mailchimp users who want to:
   - [When is this useful?](#when-is-this-useful)
   - [Gotchas](#gotchas)
     - [Date flags](#date-flags)
+    - [Drupal API key returns `403 Forbidden` error](#drupal-api-key-returns-403-forbidden-error)
     - [Scheduling emails for times that land in the past](#scheduling-emails-for-times-that-land-in-the-past)
   - [Logging](#logging)
     - [Failure notifications](#failure-notifications)
@@ -109,8 +110,8 @@ PROJ2_EMAIL_CONTENT_URL="https://example.com/email-2"
 Run from cron by setting `PROJECT` per line:
 
 ```bash
-0 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ1 CRON=true bash mc-generate.sh
-2 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ2 CRON=true bash mc-generate.sh
+0 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ1 bash mc-generate.sh
+2 10 * * * cd /path/to/mailchimp-recurring-html-email-generator; PROJECT=PROJ2 bash mc-generate.sh
 ```
 
 The script resolves `PROJECT_<VAR_NAME>` first, then falls back to the
@@ -156,6 +157,12 @@ Generating a new Mailchimp Template by flushing Drupal's cache (if you're using 
 ### Date flags
 
 This is written to run in environments with access to GNU `date` or `gdate` (available on MacOS via the `coreutils` brew package). If you're running in a Unix environment without GNU `date` or `gdate`, `date` commands may fail due to incompatible flags.
+
+### Drupal API key returns `403 Forbidden` error
+
+Drupal may return a `403` error during the step when `curl` is used to fetch the HTML data if the Drupal user attached to the API doesn't have permissions to access the content.
+
+Drupal also has an annoying habbit of blocking access to content accessible to Anonymus users if an API key is used in the request.
 
 ### Scheduling emails for times that land in the past
 
